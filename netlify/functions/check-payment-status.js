@@ -14,6 +14,27 @@ exports.handler = async function (event, context) {
   }
 
   try {
+    // Get access token - using the same method as your working display app
+    const tokenResponse = await fetch('https://oauth.zettle.com/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: new URLSearchParams({
+        'grant_type': 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+        'client_id': process.env.ZETTLE_CLIENT_ID,
+        'assertion': process.env.ZETTLE_CLIENT_SECRET
+      }).toString()
+    });
+
+    const tokenData = await tokenResponse.json();
+    const access_token = tokenData.access_token;
+
+    if (!access_token) {
+      console.error('Token response:', tokenData);
+      throw new Error('Failed to obtain access token');
+    }
+
     // In a real implementation, you would check the payment status with Zettle
     // or in your own database where you're tracking payments
     

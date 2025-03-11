@@ -21,7 +21,7 @@ exports.handler = async function (event, context) {
       };
     }
 
-    // Get access token
+    // Get access token - using the same method as your working display app
     const tokenResponse = await fetch('https://oauth.zettle.com/token', {
       method: 'POST',
       headers: {
@@ -34,9 +34,11 @@ exports.handler = async function (event, context) {
       }).toString()
     });
 
-    const { access_token } = await tokenResponse.json();
+    const tokenData = await tokenResponse.json();
+    const access_token = tokenData.access_token;
 
     if (!access_token) {
+      console.error('Token response:', tokenData);
       throw new Error('Failed to obtain access token');
     }
 
