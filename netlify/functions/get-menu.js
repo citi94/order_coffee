@@ -6,12 +6,11 @@ exports.handler = async function (event, context) {
     const tokenResponse = await fetch('https://oauth.zettle.com/token', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/x-www-form-urlencoded'
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Authorization': 'Basic ' + Buffer.from(process.env.ZETTLE_CLIENT_ID + ':' + process.env.ZETTLE_CLIENT_SECRET).toString('base64')
       },
       body: new URLSearchParams({
-        'grant_type': 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-        'client_id': process.env.ZETTLE_CLIENT_ID,
-        'assertion': process.env.ZETTLE_CLIENT_SECRET
+        'grant_type': 'client_credentials'
       }).toString()
     });
 
