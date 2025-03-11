@@ -26,10 +26,10 @@ exports.handler = async function (event, context) {
 
     console.log('Successfully obtained access token');
 
-    // Fetch products from Zettle
+    // Try the current product library endpoint first
     console.log('Fetching products from Zettle API...');
     const productsResponse = await fetch(
-      'https://inventory.izettle.com/organizations/self/products',
+      'https://products.izettle.com/organizations/self/products/v2',
       {
         headers: {
           'Authorization': `Bearer ${access_token}`
@@ -59,69 +59,82 @@ exports.handler = async function (event, context) {
       };
     }
     
-    // Check response type
-    console.log('Response type:', typeof productsData);
-    console.log('Is array:', Array.isArray(productsData));
+    // Check if we got a products array
+    let products = [];
     
-    // If not an array, check for specific error patterns
-    if (!Array.isArray(productsData)) {
-      // Handle potential error response
-      if (productsData.error) {
-        console.error('API error:', productsData.error);
-        return {
-          statusCode: 500,
-          body: JSON.stringify({
-            status: 'error',
-            message: 'Zettle API error',
-            details: productsData
-          })
-        };
-      }
-      
-      // If it's an object with different structure
+    // Handle different response formats
+    if (Array.isArray(productsData)) {
+      // Direct array of products (older API)
+      products = productsData;
+    } else if (productsData.data && Array.isArray(productsData.data)) {
+      // Newer API with data property containing products
+      products = productsData.data;
+    } else if (productsData.products && Array.isArray(productsData.products)) {
+      // Another possible format with products property
+      products = productsData.products;
+    } else {
+      // If we can't figure out the format, return the data for debugging
       return {
         statusCode: 500,
         body: JSON.stringify({
           status: 'error',
           message: 'Unexpected product data format',
           dataType: typeof productsData,
+          isArray: Array.isArray(productsData),
           preview: JSON.stringify(productsData).substring(0, 500) + '...'
-        })
-      };
-    }
-
-    // If we got an empty array
-    if (Array.isArray(productsData) && productsData.length === 0) {
-      console.log('Received empty products array from API');
-      return {
-        statusCode: 200,
-        body: JSON.stringify({
-          status: 'success',
-          message: 'No products found',
-          products: []
         })
       };
     }
 
     // Format products for our frontend (with additional error handling)
     try {
-      console.log('Formatting products data...');
-      const formattedProducts = productsData.map(product => {
+      console.log(`Processing ${products.length} products...`);
+      const formattedProducts = products.map(product => {
+        // Log the first product to understand structure
+        if (products.indexOf(product) === 0) {
+          console.log('First product structure:', JSON.stringify(product).substring(0, 500) + '...');
+        }
+        
         // Check if product has the expected structure
-        if (!product || !product.uuid) {
-          console.warn('Malformed product:', JSON.stringify(product));
+        if (!product) {
+          console.warn('Null or undefined product found');
           return null;
         }
         
+        // Handle different product structures
+        const uuid = product.uuid || product.id || product.productId;
+        if (!uuid) {
+          console.warn('Product without ID:', JSON.stringify(product).substring(0, 200));
+          return null;
+        }
+        
+        // Extract price - handle different structures
+        let price = 0;
+        if (product.variants && product.variants[0] && product.variants[0].price) {
+          price = product.variants[0].price.amount;
+        } else if (product.price && product.price.amount) {
+          price = product.price.amount;
+        } else if (product.price) {
+          price = typeof product.price === 'number' ? product.price : 0;
+        }
+        
+        // Extract category
+        let category = 'Other';
+        if (product.categories && product.categories[0] && product.categories[0].name) {
+          category = product.categories[0].name;
+        } else if (product.category && product.category.name) {
+          category = product.category.name;
+        } else if (product.categoryName) {
+          category = product.categoryName;
+        }
+        
         return {
-          id: product.uuid,
+          id: uuid,
           name: product.name || 'Unnamed Product',
           description: product.description || '',
-          price: product.variants && product.variants[0] && 
-                 product.variants[0].price && product.variants[0].price.amount || 0,
-          imageUrl: product.imageUrl || '',
-          category: product.categories && product.categories[0] && 
-                    product.categories[0].name || 'Other',
+          price: price,
+          imageUrl: product.imageUrl || product.image || '',
+          category: category,
           options: [] // We'll add option handling later
         };
       }).filter(product => product !== null); // Remove any null products

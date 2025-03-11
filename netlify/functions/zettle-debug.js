@@ -76,64 +76,72 @@ exports.handler = async function (event, context) {
       };
     }
     
-    // If we got a token, test the products endpoint
-    console.log('Testing products endpoint...');
-    const productsResponse = await fetch(
-      'https://inventory.izettle.com/organizations/self/products',
-      {
-        headers: {
-          'Authorization': `Bearer ${tokenData.access_token}`
-        }
-      }
-    );
+    // If we got a token, test multiple product endpoints
+    const endpointsToTry = [
+      'https://inventory.izettle.com/organizations/self/products', // Old endpoint
+      'https://products.izettle.com/organizations/self/products/v2', // New v2 endpoint
+      'https://products.izettle.com/organizations/self/products', // New endpoint without version
+      'https://public.izettle.com/products/v2/organizations/self/products', // Another possible endpoint
+      'https://inventory.izettle.com/v2/organizations/self/products' // Another variation
+    ];
     
-    console.log('Products response status:', productsResponse.status);
+    const results = {};
     
-    const productsText = await productsResponse.text();
-    console.log('Products response (first 200 chars):', productsText.substring(0, 200) + '...');
-    
-    try {
-      const productsData = JSON.parse(productsText);
-      console.log('Products response type:', typeof productsData);
-      console.log('Is array:', Array.isArray(productsData));
-      console.log('Items count:', Array.isArray(productsData) ? productsData.length : 'N/A');
+    for (const endpoint of endpointsToTry) {
+      console.log(`Testing endpoint: ${endpoint}`);
       
-      // Sample of data structure
-      if (Array.isArray(productsData) && productsData.length > 0) {
-        console.log('Sample product structure:', JSON.stringify(productsData[0]).substring(0, 500) + '...');
-      }
-      
-      return {
-        statusCode: 200,
-        body: JSON.stringify({
-          status: 'success',
-          message: 'Zettle API connection successful',
-          tokenStatus: {
-            received: true,
-            type: tokenData.token_type,
-            expiresIn: tokenData.expires_in
-          },
-          productsStatus: {
-            status: productsResponse.status,
-            isArray: Array.isArray(productsData),
-            count: Array.isArray(productsData) ? productsData.length : 0
+      try {
+        const response = await fetch(endpoint, {
+          headers: {
+            'Authorization': `Bearer ${tokenData.access_token}`
           }
-        })
-      };
-    } catch (error) {
-      console.error('Failed to parse products response:', error);
-      return {
-        statusCode: 500,
-        body: JSON.stringify({
-          status: 'error',
-          message: 'Failed to parse products response',
-          tokenStatus: {
-            received: true
-          },
-          responseText: productsText.substring(0, 500) + '...'
-        })
-      };
+        });
+        
+        console.log(`${endpoint} status:`, response.status);
+        
+        const responseText = await response.text();
+        
+        try {
+          const data = JSON.parse(responseText);
+          results[endpoint] = {
+            status: response.status,
+            isArray: Array.isArray(data),
+            isObject: typeof data === 'object' && !Array.isArray(data),
+            dataKeys: typeof data === 'object' && !Array.isArray(data) ? Object.keys(data) : [],
+            itemCount: Array.isArray(data) ? data.length : (data.data && Array.isArray(data.data) ? data.data.length : 'N/A')
+          };
+          
+          if (response.status === 200) {
+            // Save a sample of the successful response
+            results[endpoint].sampleData = JSON.stringify(data).substring(0, 500) + '...';
+          }
+        } catch (error) {
+          results[endpoint] = {
+            status: response.status,
+            error: 'Failed to parse JSON',
+            sampleResponse: responseText.substring(0, 200) + '...'
+          };
+        }
+      } catch (error) {
+        results[endpoint] = {
+          error: error.message
+        };
+      }
     }
+    
+    return {
+      statusCode: 200,
+      body: JSON.stringify({
+        status: 'success',
+        message: 'Zettle API endpoint tests completed',
+        tokenStatus: {
+          received: true,
+          type: tokenData.token_type,
+          expiresIn: tokenData.expires_in
+        },
+        endpointResults: results
+      })
+    };
   } catch (error) {
     console.error('Debug function error:', error);
     return {
