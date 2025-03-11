@@ -13,7 +13,8 @@ const OrderConfirmation = () => {
     if (location.state?.orderId) {
       setOrderDetails({
         orderId: location.state.orderId,
-        orderNumber: location.state.orderNumber
+        orderNumber: location.state.orderNumber,
+        pickupTime: location.state.pickupTime
       });
       setStatus('success'); // For simplicity, we'll assume success if we have order details
     } else {
@@ -35,7 +36,9 @@ const OrderConfirmation = () => {
             setStatus('success');
             setOrderDetails({
               orderId: response.orderId,
-              orderNumber: response.orderNumber
+              orderNumber: response.orderNumber,
+              // Note: In a real implementation, you would need to store and retrieve the pickup time
+              pickupTime: 'As soon as possible'
             });
             // Clear the payment ID
             localStorage.removeItem('currentPaymentId');
@@ -56,6 +59,13 @@ const OrderConfirmation = () => {
       checkStatus();
     }
   }, [location.state, navigate]);
+
+  // Get the current date
+  const getCurrentDate = () => {
+    const now = new Date();
+    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+    return now.toLocaleDateString('en-GB', options);
+  };
 
   if (status === 'processing') {
     return (
@@ -109,25 +119,28 @@ const OrderConfirmation = () => {
 
   return (
     <div className="py-10 text-center">
-      <div className="bg-green-100 border border-green-400 text-green-700 px-8 py-6 rounded mb-6 inline-block">
+      <div className="bg-green-100 border border-green-400 text-green-700 px-8 py-6 rounded mb-6 inline-block max-w-md mx-auto">
         <h1 className="text-2xl font-bold mb-4">Order Confirmed!</h1>
         <p className="text-lg mb-2">
-          Your order #{orderDetails?.orderNumber} has been received.
+          Your order #{orderDetails?.orderNumber} has been placed.
         </p>
-        <p>The barista will prepare your coffee shortly.</p>
-      </div>
-      
-      <div className="max-w-md mx-auto bg-white rounded-lg shadow-md p-6 mb-6">
-        <h2 className="text-xl font-semibold mb-4">Order Details</h2>
-        <p className="mb-2"><strong>Order Number:</strong> {orderDetails?.orderNumber}</p>
-        <p><strong>Order ID:</strong> {orderDetails?.orderId}</p>
+        <p className="mb-4">We'll start preparing your drinks shortly.</p>
+        
+        <div className="bg-white p-4 rounded-lg mb-4">
+          <h2 className="font-bold text-black mb-2">Pickup Details</h2>
+          <p className="text-black mb-1">Date: {getCurrentDate()}</p>
+          <p className="text-black font-bold text-xl">{orderDetails?.pickupTime}</p>
+          <p className="text-black text-sm mt-2">Please show this confirmation when you collect.</p>
+        </div>
+        
+        <p className="text-sm">Order ID: {orderDetails?.orderId}</p>
       </div>
       
       <Link 
         to="/" 
         className="bg-black text-white px-6 py-2 rounded hover:bg-gray-800 transition"
       >
-        Order Another Coffee
+        Order More Drinks
       </Link>
     </div>
   );

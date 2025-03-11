@@ -8,12 +8,26 @@ const Navbar = () => {
   return (
     <nav className="bg-black text-white p-4 sticky top-0 z-10 shadow-md">
       <div className="container mx-auto flex justify-between items-center">
-        <Link to="/" className="text-xl font-bold">
+        <Link to="/" className="text-xl font-bold flex items-center">
+          <svg 
+            xmlns="http://www.w3.org/2000/svg" 
+            className="h-6 w-6 mr-2" 
+            fill="none" 
+            viewBox="0 0 24 24" 
+            stroke="currentColor"
+          >
+            <path 
+              strokeLinecap="round" 
+              strokeLinejoin="round" 
+              strokeWidth={2} 
+              d="M18 4H6a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2zM4 9h16M9 4v6M15 4v6" 
+            />
+          </svg>
           Middle Street Coffee
         </Link>
         
         <div className="flex items-center">
-          <Link to="/cart" className="relative p-2">
+          <Link to="/cart" className="relative p-2 flex items-center">
             <svg 
               xmlns="http://www.w3.org/2000/svg" 
               className="h-6 w-6" 
@@ -33,6 +47,9 @@ const Navbar = () => {
                 {totalItems}
               </span>
             )}
+            <span className="ml-2 hidden sm:inline">
+              {totalItems > 0 ? `Order (${totalItems})` : 'Order'}
+            </span>
           </Link>
         </div>
       </div>

@@ -5,9 +5,12 @@ import { getMenuItems } from '../utils/api';
 const Menu = () => {
   const [menuItems, setMenuItems] = useState([]);
   const [categories, setCategories] = useState([]);
-  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [selectedCategory, setSelectedCategory] = useState('Coffee');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Define which categories we want to display
+  const hotDrinkCategories = ['Coffee', 'Tea', 'Chocolate', 'Alternative milk'];
 
   useEffect(() => {
     const fetchMenu = async () => {
@@ -15,13 +18,41 @@ const Menu = () => {
         setLoading(true);
         const data = await getMenuItems();
         
-        // Set menu items
-        setMenuItems(data.products || []);
+        if (!data || !data.products) {
+          throw new Error('Invalid data received from API');
+        }
+
+        // Filter for takeaway hot drinks and clean up names
+        const takeawayDrinks = data.products
+          .filter(item => {
+            // Include items that are in our hot drink categories
+            return hotDrinkCategories.includes(item.category);
+          })
+          .map(item => {
+            // Clean up name - remove "Takeaway" prefix if it exists
+            if (item.name.startsWith('Takeaway ')) {
+              return {
+                ...item,
+                name: item.name.replace('Takeaway ', '')
+              };
+            }
+            return item;
+          });
         
-        // Extract unique categories
-        const uniqueCategories = [...new Set(data.products.map(item => item.category))];
+        setMenuItems(takeawayDrinks);
+        
+        // Extract unique categories and ensure Coffee is first
+        let uniqueCategories = [...new Set(takeawayDrinks.map(item => item.category))];
+        
+        // Remove Coffee if it exists in the array
+        uniqueCategories = uniqueCategories.filter(cat => cat !== 'Coffee');
+        
+        // Add Coffee to the beginning
+        if (takeawayDrinks.some(item => item.category === 'Coffee')) {
+          uniqueCategories.unshift('Coffee');
+        }
+        
         setCategories(uniqueCategories);
-        
         setLoading(false);
       } catch (err) {
         setError('Failed to load menu items. Please try again later.');
@@ -31,7 +62,7 @@ const Menu = () => {
     };
 
     fetchMenu();
-  }, []);
+  }, );
 
   // Filter menu items by selected category
   const filteredItems = selectedCategory === 'all'
@@ -64,7 +95,7 @@ const Menu = () => {
 
   return (
     <div className="py-6">
-      <h1 className="text-3xl font-bold mb-6 text-center">Our Menu</h1>
+      <h1 className="text-3xl font-bold mb-6 text-center">Middle Street Coffee</h1>
       
       {/* Category filters */}
       <div className="flex overflow-x-auto pb-4 mb-6">
@@ -74,7 +105,7 @@ const Menu = () => {
           }`}
           onClick={() => setSelectedCategory('all')}
         >
-          All Items
+          All Drinks
         </button>
         
         {categories.map(category => (
