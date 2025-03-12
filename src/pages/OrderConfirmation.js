@@ -14,7 +14,8 @@ const OrderConfirmation = () => {
       setOrderDetails({
         orderId: location.state.orderId,
         orderNumber: location.state.orderNumber,
-        pickupTime: location.state.pickupTime
+        pickupTime: location.state.pickupTime,
+        customerName: location.state.customerName
       });
       setStatus('success'); // For simplicity, we'll assume success if we have order details
     } else {
@@ -38,7 +39,8 @@ const OrderConfirmation = () => {
               orderId: response.orderId,
               orderNumber: response.orderNumber,
               // Note: In a real implementation, you would need to store and retrieve the pickup time
-              pickupTime: 'As soon as possible'
+              pickupTime: 'As soon as possible',
+              customerName: 'Customer'
             });
             // Clear the payment ID
             localStorage.removeItem('currentPaymentId');
@@ -122,17 +124,18 @@ const OrderConfirmation = () => {
       <div className="bg-green-100 border border-green-400 text-green-700 px-8 py-6 rounded mb-6 inline-block max-w-md mx-auto">
         <h1 className="text-2xl font-bold mb-4">Order Confirmed!</h1>
         <p className="text-lg mb-2">
-          Your order #{orderDetails?.orderNumber} has been placed.
+          Thanks, {orderDetails?.customerName || 'Customer'}!
         </p>
-        <p className="mb-4">We'll start preparing your drinks shortly.</p>
+        <p className="mb-4">Your order #{orderDetails?.orderNumber} has been placed.</p>
         
-        <div className="bg-white p-4 rounded-lg mb-4">
+        <div className="bg-white p-4 rounded-lg mb-4 text-black">
           <h2 className="font-bold text-black mb-2">Pickup Details</h2>
           <p className="text-black mb-1">Date: {getCurrentDate()}</p>
-          <p className="text-black font-bold text-xl">{orderDetails?.pickupTime}</p>
+          <p className="text-black font-bold text-xl">Time: {orderDetails?.pickupTime}</p>
           <p className="text-black text-sm mt-2">Please show this confirmation when you collect.</p>
         </div>
         
+        <p className="text-sm mt-4">Your barista will prepare your coffee for pickup.</p>
         <p className="text-sm">Order ID: {orderDetails?.orderId}</p>
       </div>
       

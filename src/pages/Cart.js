@@ -24,31 +24,19 @@ const Cart = () => {
   const formatOptions = (options) => {
     const formattedOptions = [];
     
-    // Handle milk option with improved display
-    if (options.milk) {
-      const milkName = {
-        'regular': 'Regular Milk',
-        'oat': 'Oat Milk',
-        'almond': 'Almond Milk',
-        'soy': 'Soy Milk'
-      }[options.milk] || options.milk;
-      
-      formattedOptions.push(milkName);
+    // Format milk option
+    if (options.milk && options.milk !== "Dairy") {
+      formattedOptions.push(`${options.milk} milk`);
     }
     
-    // Handle size option with improved display
-    if (options.size) {
-      const sizeName = {
-        'regular': 'Regular Size',
-        'large': 'Large Size'
-      }[options.size] || options.size;
-      
-      formattedOptions.push(sizeName);
+    // Format caffeination option
+    if (options.caffeination && options.caffeination !== "Caffeinated") {
+      formattedOptions.push(options.caffeination);
     }
     
     // Add any other options
     Object.entries(options).forEach(([key, value]) => {
-      if (key !== 'milk' && key !== 'size') {
+      if (key !== 'milk' && key !== 'caffeination') {
         formattedOptions.push(`${key}: ${value}`);
       }
     });

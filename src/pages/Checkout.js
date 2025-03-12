@@ -56,31 +56,19 @@ const Checkout = () => {
   const formatOptions = (options) => {
     const formattedOptions = [];
     
-    // Handle milk option with improved display
-    if (options.milk) {
-      const milkName = {
-        'regular': 'Regular Milk',
-        'oat': 'Oat Milk',
-        'almond': 'Almond Milk',
-        'soy': 'Soy Milk'
-      }[options.milk] || options.milk;
-      
-      formattedOptions.push(milkName);
+    // Format milk option
+    if (options.milk && options.milk !== "Dairy") {
+      formattedOptions.push(`${options.milk} milk`);
     }
     
-    // Handle size option with improved display
-    if (options.size) {
-      const sizeName = {
-        'regular': 'Regular Size',
-        'large': 'Large Size'
-      }[options.size] || options.size;
-      
-      formattedOptions.push(sizeName);
+    // Format caffeination option
+    if (options.caffeination && options.caffeination !== "Caffeinated") {
+      formattedOptions.push(options.caffeination);
     }
     
     // Add any other options
     Object.entries(options).forEach(([key, value]) => {
-      if (key !== 'milk' && key !== 'size') {
+      if (key !== 'milk' && key !== 'caffeination') {
         formattedOptions.push(`${key}: ${value}`);
       }
     });
@@ -107,21 +95,33 @@ const Checkout = () => {
       setLoading(true);
       setError(null);
       
+      // Format special instructions for Zettle API
+      const formattedInstructions = 
+        `Pickup time: ${pickupTime}${specialInstructions ? '. ' + specialInstructions : ''}`;
+      
       // Create order first
       const orderData = {
         customerName: name,
         customerEmail: email,
-        comment: `Pickup time: ${pickupTime}${specialInstructions ? '. ' + specialInstructions : ''}`,
-        items: items.map(item => ({
-          id: item.id,
-          name: item.name,
-          quantity: item.quantity,
-          unitPrice: item.price,
-          options: item.options
-        })),
+        comment: formattedInstructions,
+        items: items.map(item => {
+          // Format options as comment
+          const optionsText = formatOptions(item.options);
+          const itemComment = optionsText.length > 0 ? optionsText.join(', ') : '';
+          
+          return {
+            id: item.id,
+            name: item.name,
+            quantity: item.quantity,
+            unitPrice: item.price,
+            options: item.options,
+            comment: itemComment
+          };
+        }),
         totalAmount
       };
       
+      // Send to API
       const orderResponse = await createOrder(orderData);
       
       // Then initiate payment
@@ -145,7 +145,8 @@ const Checkout = () => {
           state: { 
             orderId: orderResponse.orderId,
             orderNumber: orderResponse.orderNumber,
-            pickupTime: pickupTime
+            pickupTime: pickupTime,
+            customerName: name
           } 
         });
       }

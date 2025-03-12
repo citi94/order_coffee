@@ -1,44 +1,130 @@
 import React, { useState, useEffect } from 'react';
 import { useCart } from '../context/CartContext';
 
-const ProductCard = ({ product, originalProductData }) => {
+const CoffeeProductCard = ({ product }) => {
   const { addToCart } = useCart();
-  const [selectedOptions, setSelectedOptions] = useState({});
   const [quantity, setQuantity] = useState(1);
-  const [hasVariants, setHasVariants] = useState(false);
-  const [variants, setVariants] = useState([]);
-  const [selectedVariant, setSelectedVariant] = useState('');
+  const [selectedOptions, setSelectedOptions] = useState({});
+  const [isTakeaway, setIsTakeaway] = useState(true);
+  const [displayName, setDisplayName] = useState('');
 
-  // Examine the product data to extract any options or variants
+  // Process the product name on mount
   useEffect(() => {
-    // Check if the product has multiple variants
-    if (originalProductData && originalProductData.variants && originalProductData.variants.length > 1) {
-      setHasVariants(true);
-      setVariants(originalProductData.variants);
-      // Set default variant to the first one
-      setSelectedVariant(originalProductData.variants[0].uuid);
+    // Remove "Takeaway" or "Eat-In" prefix for display
+    let name = product.name;
+    if (name.startsWith('Takeaway ')) {
+      name = name.replace('Takeaway ', '');
+      setIsTakeaway(true);
+    } else if (name.startsWith('Eat-In ')) {
+      name = name.replace('Eat-In ', '');
+      setIsTakeaway(false);
     }
-  }, [originalProductData]);
+    setDisplayName(name);
+  }, [product.name]);
 
-  // Determine if this is a coffee drink
-  const isCoffeeDrink = product.category === 'Coffee' && 
-                        !product.name.toLowerCase().includes('espresso') &&
-                        !product.name.toLowerCase().includes('americano');
+  // Find takeaway variant for this product
+  const findTakeawayVariants = () => {
+    if (!product.variants || !Array.isArray(product.variants)) {
+      return [];
+    }
 
-  // Default milk options - used when no specific milk options found in the API
-  const defaultMilkOptions = [
-    { id: 'regular', name: 'Regular Milk', priceDelta: 0 },
-    { id: 'oat', name: 'Oat Milk', priceDelta: 0 },  // No extra charge for oat milk
-    { id: 'almond', name: 'Almond Milk', priceDelta: 0 },
-    { id: 'soy', name: 'Soy Milk', priceDelta: 0 }
-  ];
+    // For products with Finish option
+    const takeawayVariants = product.variants.filter(variant => {
+      if (!variant.options) return false;
+      return variant.options.some(option => 
+        option.name === "Finish" && option.value.includes("Takeaway")
+      );
+    });
 
-  // Handle variant selection
-  const handleVariantChange = (e) => {
-    setSelectedVariant(e.target.value);
+    // If no explicit takeaway variants, check if the product name starts with "Takeaway"
+    if (takeawayVariants.length === 0 && product.name.startsWith('Takeaway')) {
+      return product.variants;
+    }
+
+    return takeawayVariants.length > 0 ? takeawayVariants : product.variants;
   };
 
-  // Handle milk option selection
+  // Get all the milk options available for this product
+  const extractMilkOptions = () => {
+    const variants = findTakeawayVariants();
+    const milkOptions = new Set();
+    
+    variants.forEach(variant => {
+      if (!variant.options) return;
+      
+      variant.options.forEach(option => {
+        if (option.name === "flavour") {
+          milkOptions.add(option.value);
+        }
+      });
+    });
+    
+    return Array.from(milkOptions).map(milk => ({
+      id: milk.toLowerCase().replace(/\s+/g, ''),
+      name: milk,
+      // All milk options appear to be the same price based on your data
+      priceDelta: 0
+    }));
+  };
+
+  // Get all caffeination options
+  const extractCaffeinationOptions = () => {
+    const variants = findTakeawayVariants();
+    const caffOptions = new Set();
+    
+    variants.forEach(variant => {
+      if (!variant.options) return;
+      
+      variant.options.forEach(option => {
+        if (option.name === "Style") {
+          caffOptions.add(option.value);
+        }
+      });
+    });
+    
+    return Array.from(caffOptions).map(style => ({
+      id: style.toLowerCase().trim().replace(/\s+/g, ''),
+      name: style.trim()
+    }));
+  };
+
+  // Find the right variant based on selected options
+  const findMatchingVariant = (options) => {
+    if (!product.variants) return null;
+    
+    // Extract the needed options
+    const milkType = options.milk || "Dairy";
+    const caffType = options.caffeination || "Caffeinated";
+    
+    // Find a matching variant
+    return product.variants.find(variant => {
+      if (!variant.options) return false;
+      
+      // Check for matching milk
+      const hasMilk = variant.options.some(opt => 
+        opt.name === "flavour" && opt.value === milkType
+      );
+      
+      // Check for matching caffeination
+      const hasCaff = variant.options.some(opt => 
+        opt.name === "Style" && opt.value.trim() === caffType
+      );
+      
+      // Check for takeaway
+      const isTakeaway = variant.options.some(opt => 
+        opt.name === "Finish" && opt.value.includes("Takeaway")
+      );
+      
+      // For products with "Finish" option, must be takeaway
+      if (variant.options.some(opt => opt.name === "Finish")) {
+        return hasMilk && hasCaff && isTakeaway;
+      }
+      
+      // For products without "Finish" but with other options
+      return hasMilk && hasCaff;
+    });
+  };
+
   const handleMilkChange = (e) => {
     setSelectedOptions({
       ...selectedOptions,
@@ -46,38 +132,45 @@ const ProductCard = ({ product, originalProductData }) => {
     });
   };
 
-  // Calculate the current price based on selected variant
-  const getCurrentPrice = () => {
-    if (hasVariants && selectedVariant) {
-      const variant = variants.find(v => v.uuid === selectedVariant);
-      return variant && variant.price ? variant.price.amount : product.price;
-    }
-    return product.price;
-  };
-
-  const getVariantName = () => {
-    if (hasVariants && selectedVariant) {
-      const variant = variants.find(v => v.uuid === selectedVariant);
-      return variant && variant.name ? ` (${variant.name})` : '';
-    }
-    return '';
+  const handleCaffeinationChange = (e) => {
+    setSelectedOptions({
+      ...selectedOptions,
+      caffeination: e.target.value
+    });
   };
 
   const handleAddToCart = () => {
-    // Create item name including variant if selected
-    const itemName = `${product.name}${getVariantName()}`;
+    // Build options object for the cart
+    const options = { ...selectedOptions };
     
-    // Calculate final price based on selected variant
-    const finalPrice = getCurrentPrice();
+    // Find matching variant if available
+    const matchingVariant = findMatchingVariant(options);
     
-    // Add the item to cart
+    // Determine the price to use
+    const price = matchingVariant ? 
+      (matchingVariant.price ? matchingVariant.price.amount : product.price) : 
+      product.price;
+    
+    // Build the item name
+    let itemName = displayName;
+    
+    // Add options to name if specified
+    if (options.caffeination && options.caffeination !== "Caffeinated") {
+      itemName = `${itemName} (${options.caffeination})`;
+    }
+    
+    if (options.milk && options.milk !== "Dairy") {
+      itemName = `${itemName} with ${options.milk}`;
+    }
+    
+    // Add to cart
     addToCart({
-      id: hasVariants && selectedVariant ? selectedVariant : product.id,
+      id: matchingVariant ? matchingVariant.uuid : product.id,
       name: itemName,
-      productId: product.id, // Always store the original product ID
-      price: finalPrice,
-      options: selectedOptions,
-      quantity: quantity
+      price: price,
+      options: options,
+      quantity: quantity,
+      productId: product.uuid // Original product ID for reference
     });
     
     // Reset selection
@@ -85,17 +178,27 @@ const ProductCard = ({ product, originalProductData }) => {
     setSelectedOptions({});
   };
 
+  // Only show for takeaway coffee products
+  const isCoffeeProduct = product.category && product.category.name === 'Coffee';
+  const milkOptions = extractMilkOptions();
+  const caffeinationOptions = extractCaffeinationOptions();
+  
+  // Skip non-takeaway or non-coffee products
+  if (!isCoffeeProduct || (product.name.startsWith('Eat-In') && !findTakeawayVariants().length)) {
+    return null;
+  }
+
   return (
     <div className="border rounded-lg overflow-hidden shadow-md bg-white h-full flex flex-col">
       <div className="p-4 flex-grow">
-        <h3 className="text-xl font-semibold mb-2">{product.name}</h3>
+        <h3 className="text-xl font-semibold mb-2">{displayName}</h3>
         
         {product.description && (
           <p className="text-gray-600 mb-4">{product.description}</p>
         )}
         
         <div className="flex justify-between items-center mb-4">
-          <span className="text-lg font-bold">£{(getCurrentPrice() / 100).toFixed(2)}</span>
+          <span className="text-lg font-bold">£{(product.price / 100).toFixed(2)}</span>
           
           <div className="flex items-center">
             <button 
@@ -114,45 +217,40 @@ const ProductCard = ({ product, originalProductData }) => {
           </div>
         </div>
         
-        {/* Variant selection - if product has variants */}
-        {hasVariants && (
+        {/* Milk options */}
+        {milkOptions.length > 0 && (
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Size
+              Milk
             </label>
             <select
               className="w-full border rounded p-2"
-              value={selectedVariant}
-              onChange={handleVariantChange}
+              value={selectedOptions.milk || "Dairy"}
+              onChange={handleMilkChange}
             >
-              {variants.map((variant) => (
-                <option key={variant.uuid} value={variant.uuid}>
-                  {variant.name || 'Regular'} 
-                  {/* Show price difference if different from default */}
-                  {variant.price && product.price !== variant.price.amount && 
-                    ` - £${(variant.price.amount / 100).toFixed(2)}`}
+              {milkOptions.map((option) => (
+                <option key={option.id} value={option.name}>
+                  {option.name}
                 </option>
               ))}
             </select>
           </div>
         )}
         
-        {/* Milk options for coffee drinks */}
-        {isCoffeeDrink && (
+        {/* Caffeination options */}
+        {caffeinationOptions.length > 1 && (
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Milk Option
+              Coffee Type
             </label>
             <select
               className="w-full border rounded p-2"
-              value={selectedOptions.milk || ''}
-              onChange={handleMilkChange}
+              value={selectedOptions.caffeination || "Caffeinated"}
+              onChange={handleCaffeinationChange}
             >
-              <option value="">Regular Milk</option>
-              {defaultMilkOptions.filter(o => o.id !== 'regular').map((option) => (
-                <option key={option.id} value={option.id}>
+              {caffeinationOptions.map((option) => (
+                <option key={option.id} value={option.name}>
                   {option.name}
-                  {option.priceDelta > 0 && ` (+£${(option.priceDelta / 100).toFixed(2)})`}
                 </option>
               ))}
             </select>
@@ -172,4 +270,4 @@ const ProductCard = ({ product, originalProductData }) => {
   );
 };
 
-export default ProductCard;
+export default CoffeeProductCard;
