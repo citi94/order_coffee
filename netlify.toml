@@ -3,13 +3,8 @@
   publish = "build"
   functions = "netlify/functions"
 
-# Redirects and rewrites
+# Redirects for SPA (Single Page Application)
 [[redirects]]
   from = "/*"
   to = "/index.html"
-  status = 200
-
-[[redirects]]
-  from = "/.netlify/functions/*"
-  to = "/.netlify/functions/:splat"
   status = 200
