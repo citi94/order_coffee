@@ -6,7 +6,7 @@ import { getMenuItems } from '../utils/api';
 const Menu = () => {
   const [menuItems, setMenuItems] = useState([]);
   const [categories, setCategories] = useState([]);
-  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [selectedCategory, setSelectedCategory] = useState('Coffee');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -20,17 +20,23 @@ const Menu = () => {
           throw new Error('Invalid data received from API');
         }
 
-        // Process menu items and extract categories
-        const processedItems = data.products
-          .sort((a, b) => a.name.localeCompare(b.name));
+        // Process menu items
+        const allItems = data.products.sort((a, b) => a.name.localeCompare(b.name));
         
-        const uniqueCategories = [...new Set(processedItems
-          .filter(item => item.category)
-          .map(item => item.category.name || 'Other'))
-        ];
+        // Extract categories
+        const categorySet = new Set();
+        allItems.forEach(item => {
+          const categoryName = item.category?.name || 'Other';
+          categorySet.add(categoryName);
+        });
         
-        setMenuItems(processedItems);
-        setCategories(uniqueCategories);
+        // Make sure Coffee is first, followed by other categories
+        const sortedCategories = ['Coffee', ...Array.from(categorySet)
+          .filter(cat => cat !== 'Coffee')
+          .sort()];
+        
+        setMenuItems(allItems);
+        setCategories(sortedCategories);
         setLoading(false);
       } catch (err) {
         console.error('Error fetching menu:', err);
@@ -43,17 +49,36 @@ const Menu = () => {
   }, []);
 
   // Filter items by selected category
-  const filteredItems = selectedCategory === 'all'
-    ? menuItems
-    : menuItems.filter(item => item.category && item.category.name === selectedCategory);
+  const filteredItems = menuItems.filter(item => {
+    const itemCategory = item.category?.name || 'Other';
+    return itemCategory === selectedCategory;
+  });
+
+  // Common coffee drink types to prioritize
+  const popularCoffees = [
+    'Latte', 'Cappuccino', 'Flat White', 'Americano', 
+    'Espresso', 'Mocha', 'Cortado', 'Macchiato'
+  ];
+  
+  // Sort coffee items to prioritize popular drinks
+  const sortedItems = [...filteredItems].sort((a, b) => {
+    if (selectedCategory === 'Coffee') {
+      const aIsPopular = popularCoffees.some(coffee => 
+        a.name.toLowerCase().includes(coffee.toLowerCase()));
+      const bIsPopular = popularCoffees.some(coffee => 
+        b.name.toLowerCase().includes(coffee.toLowerCase()));
+      
+      if (aIsPopular && !bIsPopular) return -1;
+      if (!aIsPopular && bIsPopular) return 1;
+    }
+    return a.name.localeCompare(b.name);
+  });
 
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
         <div className="text-center">
-          <div className="spinner-border animate-spin inline-block w-8 h-8 border-4 rounded-full" role="status">
-            <span className="visually-hidden">Loading...</span>
-          </div>
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-black"></div>
           <p className="mt-2">Loading menu...</p>
         </div>
       </div>
@@ -73,39 +98,29 @@ const Menu = () => {
 
   return (
     <div className="py-6">
-      <h1 className="text-3xl font-bold mb-6 text-center">Middle Street Coffee</h1>
+      <h1 className="text-3xl font-bold mb-2 text-center">Middle Street Coffee</h1>
       <p className="text-center mb-6">Order for takeaway</p>
       
-      {/* Category filters */}
-      {categories.length > 0 && (
-        <div className="flex overflow-x-auto pb-4 mb-6">
+      {/* Category tabs */}
+      <div className="flex overflow-x-auto pb-4 mb-6 justify-center">
+        {categories.map(category => (
           <button
-            className={`whitespace-nowrap px-4 py-2 rounded-full mr-2 ${
-              selectedCategory === 'all' ? 'bg-black text-white' : 'bg-gray-200'
-            }`}
-            onClick={() => setSelectedCategory('all')}
+            key={category}
+            className={`whitespace-nowrap px-6 py-2 mx-1 rounded-full 
+              ${selectedCategory === category 
+                ? 'bg-black text-white' 
+                : 'bg-gray-200 hover:bg-gray-300'}`}
+            onClick={() => setSelectedCategory(category)}
           >
-            All Items
+            {category}
           </button>
-          
-          {categories.map(category => (
-            <button
-              key={category}
-              className={`whitespace-nowrap px-4 py-2 rounded-full mr-2 ${
-                selectedCategory === category ? 'bg-black text-white' : 'bg-gray-200'
-              }`}
-              onClick={() => setSelectedCategory(category)}
-            >
-              {category}
-            </button>
-          ))}
-        </div>
-      )}
+        ))}
+      </div>
       
+      {/* Product grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredItems.map(item => {
-          // Use CoffeeProductCard for coffee items, ProductCard for others
-          if (item.category && item.category.name === 'Coffee') {
+        {sortedItems.map(item => {
+          if (selectedCategory === 'Coffee') {
             return <CoffeeProductCard key={item.id || item.uuid} product={item} />;
           } else {
             return <ProductCard key={item.id || item.uuid} product={item} />;
@@ -113,8 +128,8 @@ const Menu = () => {
         })}
       </div>
       
-      {/* If no items are displayed */}
-      {filteredItems.length === 0 && (
+      {/* Empty state */}
+      {sortedItems.length === 0 && (
         <div className="text-center py-10">
           <p>No products available in this category.</p>
         </div>

@@ -5,10 +5,17 @@ const ProductCard = ({ product }) => {
   const { addToCart } = useCart();
   const [quantity, setQuantity] = useState(1);
 
+  // Clean up product name - remove eat-in/takeaway prefixes
+  const getDisplayName = () => {
+    let name = product.name || '';
+    name = name.replace(/^(takeaway|eat-in)\s+/i, '');
+    return name;
+  };
+
   const handleAddToCart = () => {
     addToCart({
-      id: product.id,
-      name: product.name,
+      id: product.id || product.uuid,
+      name: getDisplayName(),
       price: product.price,
       options: {},
       quantity: quantity
@@ -18,20 +25,15 @@ const ProductCard = ({ product }) => {
     setQuantity(1);
   };
 
+  // Skip items with "Eat-in" in the name
+  if (product.name && product.name.toLowerCase().includes('eat-in')) {
+    return null;
+  }
+
   return (
     <div className="border rounded-lg overflow-hidden shadow-md bg-white h-full flex flex-col">
-      {product.imageUrl && (
-        <div className="h-48 bg-gray-200">
-          <img 
-            src={product.imageUrl} 
-            alt={product.name} 
-            className="w-full h-full object-cover"
-          />
-        </div>
-      )}
-      
       <div className="p-4 flex-grow">
-        <h3 className="text-xl font-semibold mb-2">{product.name}</h3>
+        <h3 className="text-xl font-semibold mb-2">{getDisplayName()}</h3>
         
         {product.description && (
           <p className="text-gray-600 mb-4">{product.description}</p>
@@ -43,14 +45,16 @@ const ProductCard = ({ product }) => {
           <div className="flex items-center">
             <button 
               onClick={() => setQuantity(Math.max(1, quantity - 1))}
-              className="bg-gray-200 px-2 py-1 rounded-l"
+              className="bg-gray-200 px-3 py-1 rounded-l"
+              aria-label="Decrease quantity"
             >
               -
             </button>
-            <span className="bg-gray-100 px-3 py-1">{quantity}</span>
+            <span className="bg-gray-100 px-4 py-1">{quantity}</span>
             <button 
               onClick={() => setQuantity(quantity + 1)}
-              className="bg-gray-200 px-2 py-1 rounded-r"
+              className="bg-gray-200 px-3 py-1 rounded-r"
+              aria-label="Increase quantity"
             >
               +
             </button>
@@ -61,7 +65,7 @@ const ProductCard = ({ product }) => {
       <div className="p-4 pt-0">
         <button
           onClick={handleAddToCart}
-          className="w-full bg-black text-white py-2 rounded hover:bg-gray-800 transition"
+          className="w-full bg-black text-white py-3 rounded font-medium hover:bg-gray-800 transition"
         >
           Add to Cart
         </button>
