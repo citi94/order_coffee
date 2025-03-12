@@ -1,64 +1,80 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useCart } from '../context/CartContext';
 
-const ProductCard = ({ product }) => {
+const ProductCard = ({ product, originalProductData }) => {
   const { addToCart } = useCart();
   const [selectedOptions, setSelectedOptions] = useState({});
   const [quantity, setQuantity] = useState(1);
-  const [milkOption, setMilkOption] = useState('');
+  const [hasVariants, setHasVariants] = useState(false);
+  const [variants, setVariants] = useState([]);
+  const [selectedVariant, setSelectedVariant] = useState('');
 
-  // Default milk options
-  const milkOptions = [
+  // Examine the product data to extract any options or variants
+  useEffect(() => {
+    // Check if the product has multiple variants
+    if (originalProductData && originalProductData.variants && originalProductData.variants.length > 1) {
+      setHasVariants(true);
+      setVariants(originalProductData.variants);
+      // Set default variant to the first one
+      setSelectedVariant(originalProductData.variants[0].uuid);
+    }
+  }, [originalProductData]);
+
+  // Determine if this is a coffee drink
+  const isCoffeeDrink = product.category === 'Coffee' && 
+                        !product.name.toLowerCase().includes('espresso') &&
+                        !product.name.toLowerCase().includes('americano');
+
+  // Default milk options - used when no specific milk options found in the API
+  const defaultMilkOptions = [
     { id: 'regular', name: 'Regular Milk', priceDelta: 0 },
-    { id: 'oat', name: 'Oat Milk', priceDelta: 50 },
-    { id: 'almond', name: 'Almond Milk', priceDelta: 50 },
-    { id: 'soy', name: 'Soy Milk', priceDelta: 50 }
+    { id: 'oat', name: 'Oat Milk', priceDelta: 0 },  // No extra charge for oat milk
+    { id: 'almond', name: 'Almond Milk', priceDelta: 0 },
+    { id: 'soy', name: 'Soy Milk', priceDelta: 0 }
   ];
 
-  // Default size options for drinks
-  const sizeOptions = [
-    { id: 'regular', name: 'Regular', priceDelta: 0 },
-    { id: 'large', name: 'Large', priceDelta: 50 }
-  ];
+  // Handle variant selection
+  const handleVariantChange = (e) => {
+    setSelectedVariant(e.target.value);
+  };
 
+  // Handle milk option selection
   const handleMilkChange = (e) => {
-    setMilkOption(e.target.value);
-    
-    // Update the options state
     setSelectedOptions({
       ...selectedOptions,
       milk: e.target.value
     });
   };
 
-  const handleSizeChange = (e) => {
-    setSelectedOptions({
-      ...selectedOptions,
-      size: e.target.value
-    });
+  // Calculate the current price based on selected variant
+  const getCurrentPrice = () => {
+    if (hasVariants && selectedVariant) {
+      const variant = variants.find(v => v.uuid === selectedVariant);
+      return variant && variant.price ? variant.price.amount : product.price;
+    }
+    return product.price;
+  };
+
+  const getVariantName = () => {
+    if (hasVariants && selectedVariant) {
+      const variant = variants.find(v => v.uuid === selectedVariant);
+      return variant && variant.name ? ` (${variant.name})` : '';
+    }
+    return '';
   };
 
   const handleAddToCart = () => {
-    // Create a name that includes the selected options
-    let itemName = product.name;
+    // Create item name including variant if selected
+    const itemName = `${product.name}${getVariantName()}`;
     
-    // Calculate final price including any option upcharges
-    let finalPrice = product.price;
+    // Calculate final price based on selected variant
+    const finalPrice = getCurrentPrice();
     
-    if (selectedOptions.milk) {
-      const selectedMilk = milkOptions.find(option => option.id === selectedOptions.milk);
-      if (selectedMilk && selectedMilk.priceDelta) {
-        finalPrice += selectedMilk.priceDelta;
-      }
-    }
-    
-    if (selectedOptions.size === 'large') {
-      finalPrice += 50; // Add 50p for large size
-    }
-    
+    // Add the item to cart
     addToCart({
-      id: product.id,
+      id: hasVariants && selectedVariant ? selectedVariant : product.id,
       name: itemName,
+      productId: product.id, // Always store the original product ID
       price: finalPrice,
       options: selectedOptions,
       quantity: quantity
@@ -67,13 +83,7 @@ const ProductCard = ({ product }) => {
     // Reset selection
     setQuantity(1);
     setSelectedOptions({});
-    setMilkOption('');
   };
-
-  // Check if this is a coffee drink that should have milk options
-  const isCoffeeDrink = product.category === 'Coffee' && 
-                        !product.name.toLowerCase().includes('espresso') &&
-                        !product.name.toLowerCase().includes('americano');
 
   return (
     <div className="border rounded-lg overflow-hidden shadow-md bg-white h-full flex flex-col">
@@ -85,7 +95,7 @@ const ProductCard = ({ product }) => {
         )}
         
         <div className="flex justify-between items-center mb-4">
-          <span className="text-lg font-bold">£{(product.price / 100).toFixed(2)}</span>
+          <span className="text-lg font-bold">£{(getCurrentPrice() / 100).toFixed(2)}</span>
           
           <div className="flex items-center">
             <button 
@@ -104,26 +114,30 @@ const ProductCard = ({ product }) => {
           </div>
         </div>
         
-        {/* Size options for all drinks */}
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Size
-          </label>
-          <select
-            className="w-full border rounded p-2"
-            value={selectedOptions.size || ''}
-            onChange={handleSizeChange}
-          >
-            <option value="">Select Size</option>
-            {sizeOptions.map((option) => (
-              <option key={option.id} value={option.id}>
-                {option.name} {option.priceDelta > 0 && `(+£${(option.priceDelta / 100).toFixed(2)})`}
-              </option>
-            ))}
-          </select>
-        </div>
+        {/* Variant selection - if product has variants */}
+        {hasVariants && (
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Size
+            </label>
+            <select
+              className="w-full border rounded p-2"
+              value={selectedVariant}
+              onChange={handleVariantChange}
+            >
+              {variants.map((variant) => (
+                <option key={variant.uuid} value={variant.uuid}>
+                  {variant.name || 'Regular'} 
+                  {/* Show price difference if different from default */}
+                  {variant.price && product.price !== variant.price.amount && 
+                    ` - £${(variant.price.amount / 100).toFixed(2)}`}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         
-        {/* Milk options only for coffee drinks that typically have milk */}
+        {/* Milk options for coffee drinks */}
         {isCoffeeDrink && (
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -131,13 +145,14 @@ const ProductCard = ({ product }) => {
             </label>
             <select
               className="w-full border rounded p-2"
-              value={milkOption}
+              value={selectedOptions.milk || ''}
               onChange={handleMilkChange}
             >
-              <option value="">Select Milk</option>
-              {milkOptions.map((option) => (
+              <option value="">Regular Milk</option>
+              {defaultMilkOptions.filter(o => o.id !== 'regular').map((option) => (
                 <option key={option.id} value={option.id}>
-                  {option.name} {option.priceDelta > 0 && `(+£${(option.priceDelta / 100).toFixed(2)})`}
+                  {option.name}
+                  {option.priceDelta > 0 && ` (+£${(option.priceDelta / 100).toFixed(2)})`}
                 </option>
               ))}
             </select>

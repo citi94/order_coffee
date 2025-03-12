@@ -19,16 +19,21 @@ const Menu = () => {
           throw new Error('Invalid data received from API');
         }
 
-        // Process drinks - focus on hot drinks and remove "Takeaway" prefix
+        // Process items - focus on all items and remove "Takeaway" prefix
+        // Keep the original product data structure intact for options
         const processedItems = data.products.map(item => {
+          // Create a processed copy of the item
+          const processedItem = { ...item };
+          
           // Remove "Takeaway" prefix if it exists
-          if (item.name.startsWith('Takeaway ')) {
-            return {
-              ...item,
-              name: item.name.replace('Takeaway ', '')
-            };
+          if (processedItem.name.startsWith('Takeaway ')) {
+            processedItem.name = processedItem.name.replace('Takeaway ', '');
           }
-          return item;
+          
+          // Note: Here we'd extract any variants or options if needed
+          // But we'll work with what Zettle provides through the API
+          
+          return processedItem;
         });
         
         setMenuItems(processedItems);
@@ -119,7 +124,12 @@ const Menu = () => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredItems.map(item => (
-            <ProductCard key={item.id} product={item} />
+            <ProductCard 
+              key={item.id} 
+              product={item} 
+              // Pass the complete product with all its data
+              originalProductData={item}
+            />
           ))}
         </div>
       )}
