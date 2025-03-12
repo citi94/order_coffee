@@ -7,9 +7,9 @@ const Checkout = () => {
   const navigate = useNavigate();
   const { items, totalAmount, clearCart } = useCart();
   const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
   const [pickupTime, setPickupTime] = useState('');
-  const [specialInstructions, setSpecialInstructions] = useState('');
+  const [email, setEmail] = useState('');
+  const [note, setNote] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -53,27 +53,22 @@ const Checkout = () => {
   
   const pickupTimes = generatePickupTimes();
 
-  const formatOptions = (options) => {
+  const formatItemOptions = (options) => {
     const formattedOptions = [];
     
-    // Format milk option
-    if (options.milk && options.milk !== "Dairy") {
+    if (options.size && options.size !== 'Regular') {
+      formattedOptions.push(options.size);
+    }
+    
+    if (options.milk && options.milk !== 'Dairy') {
       formattedOptions.push(`${options.milk} milk`);
     }
     
-    // Format caffeination option
-    if (options.caffeination && options.caffeination !== "Caffeinated") {
-      formattedOptions.push(options.caffeination);
+    if (options.caffeinated === false) {
+      formattedOptions.push('Decaf');
     }
     
-    // Add any other options
-    Object.entries(options).forEach(([key, value]) => {
-      if (key !== 'milk' && key !== 'caffeination') {
-        formattedOptions.push(`${key}: ${value}`);
-      }
-    });
-    
-    return formattedOptions;
+    return formattedOptions.join(', ');
   };
 
   const handleSubmit = async (e) => {
@@ -95,19 +90,17 @@ const Checkout = () => {
       setLoading(true);
       setError(null);
       
-      // Format special instructions for Zettle API
-      const formattedInstructions = 
-        `Pickup time: ${pickupTime}${specialInstructions ? '. ' + specialInstructions : ''}`;
+      // Format note and pickup time for Zettle API
+      const formattedNote = `Pickup time: ${pickupTime}${note ? `. ${note}` : ''}`;
       
       // Create order first
       const orderData = {
         customerName: name,
         customerEmail: email,
-        comment: formattedInstructions,
+        comment: formattedNote,
         items: items.map(item => {
           // Format options as comment
-          const optionsText = formatOptions(item.options);
-          const itemComment = optionsText.length > 0 ? optionsText.join(', ') : '';
+          const optionsText = formatItemOptions(item.options);
           
           return {
             id: item.id,
@@ -115,14 +108,18 @@ const Checkout = () => {
             quantity: item.quantity,
             unitPrice: item.price,
             options: item.options,
-            comment: itemComment
+            comment: optionsText
           };
         }),
         totalAmount
       };
       
-      // Send to API
+      // Create order in Zettle
       const orderResponse = await createOrder(orderData);
+      
+      if (!orderResponse || !orderResponse.orderId) {
+        throw new Error('Failed to create order');
+      }
       
       // Then initiate payment
       const paymentResponse = await initiatePayment({
@@ -130,16 +127,15 @@ const Checkout = () => {
         amount: totalAmount
       });
       
-      // If we have Apple Pay / Google Pay support
+      // For Apple Pay / Google Pay support
       if (paymentResponse.paymentUrl) {
         // For Apple Pay / Google Pay, we'll handle in the browser
-        // This is simplified - in a real app you would integrate with the Payment Request API
         window.location.href = paymentResponse.paymentUrl;
       } else {
         // Save the payment ID to check status later
         localStorage.setItem('currentPaymentId', paymentResponse.paymentId);
         
-        // For now, let's simulate a successful payment and go to confirmation
+        // Clear cart and go to confirmation page
         clearCart();
         navigate('/confirmation', { 
           state: { 
@@ -159,24 +155,22 @@ const Checkout = () => {
   };
 
   return (
-    <div className="py-6">
+    <div className="py-6 px-4">
       <h1 className="text-2xl font-bold mb-6">Checkout</h1>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Order summary */}
         <div className="bg-white rounded-lg shadow-md p-6">
-          <h2 className="text-xl font-semibold mb-4">Your Order</h2>
+          <h2 className="text-xl font-semibold mb-4">Order Summary</h2>
           
           {items.map((item, index) => (
             <div key={index} className="flex justify-between py-2 border-b last:border-b-0">
               <div>
                 <span className="font-medium">{item.quantity}x </span>
                 {item.name}
-                {Object.keys(item.options).length > 0 && (
+                {Object.keys(item.options || {}).length > 0 && (
                   <div className="text-sm text-gray-600">
-                    {formatOptions(item.options).map((option, i) => (
-                      <div key={i}>{option}</div>
-                    ))}
+                    {formatItemOptions(item.options)}
                   </div>
                 )}
               </div>
@@ -192,7 +186,7 @@ const Checkout = () => {
         
         {/* Customer information */}
         <div className="bg-white rounded-lg shadow-md p-6">
-          <h2 className="text-xl font-semibold mb-4">Your Details</h2>
+          <h2 className="text-xl font-semibold mb-4">Pickup Details</h2>
           
           <form onSubmit={handleSubmit}>
             <div className="mb-4">
@@ -230,7 +224,7 @@ const Checkout = () => {
             
             <div className="mb-4">
               <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-                Email (for receipt - optional)
+                Email (optional)
               </label>
               <input
                 type="email"
@@ -238,21 +232,21 @@ const Checkout = () => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full border rounded p-2"
-                placeholder="your@email.com (optional)"
+                placeholder="For receipt (optional)"
               />
             </div>
             
             <div className="mb-4">
-              <label htmlFor="specialInstructions" className="block text-sm font-medium text-gray-700 mb-1">
-                Special Instructions (optional)
+              <label htmlFor="note" className="block text-sm font-medium text-gray-700 mb-1">
+                Order Note (optional)
               </label>
               <textarea
-                id="specialInstructions"
-                value={specialInstructions}
-                onChange={(e) => setSpecialInstructions(e.target.value)}
+                id="note"
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
                 className="w-full border rounded p-2"
-                rows="3"
-                placeholder="Any special requests for your drinks"
+                rows="2"
+                placeholder="Any special requests"
               />
             </div>
             

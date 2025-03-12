@@ -1,14 +1,22 @@
-import React, { useState, useEffect } from 'react';
-import CoffeeProductCard from '../components/CoffeeProductCard';
-import ProductCard from '../components/ProductCard';
+import React, { useState, useEffect, useMemo } from 'react';
 import { getMenuItems } from '../utils/api';
+import CoffeeCard from '../components/CoffeeCard';
+import CustomizationModal from '../components/CustomizationModal';
+import AddOnCard from '../components/AddOnCard';
 
 const Menu = () => {
-  const [menuItems, setMenuItems] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [selectedCategory, setSelectedCategory] = useState('Coffee');
+  const [coffeeItems, setCoffeeItems] = useState([]);
+  const [foodItems, setFoodItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [selectedCoffee, setSelectedCoffee] = useState(null);
+  const [isCustomizing, setIsCustomizing] = useState(false);
+
+  // Common coffee drinks to focus on
+  const popularCoffees = useMemo(() => [
+    'Latte', 'Cappuccino', 'Flat White', 'Americano', 
+    'Espresso', 'Mocha', 'Cortado', 'Macchiato', 'Iced Latte'
+  ], []);
 
   useEffect(() => {
     const fetchMenu = async () => {
@@ -20,23 +28,64 @@ const Menu = () => {
           throw new Error('Invalid data received from API');
         }
 
-        // Process menu items
-        const allItems = data.products.sort((a, b) => a.name.localeCompare(b.name));
+        // Process coffee items - focus on takeaway options
+        const allCoffees = data.products.filter(item => {
+          // Check if the item is in the Coffee category
+          const isCoffee = item.category && item.category.name === 'Coffee';
+          
+          // Check if it's a takeaway variant or has takeaway options
+          const hasTakeaway = item.name && (
+            item.name.toLowerCase().includes('takeaway') ||
+            (item.variants && item.variants.some(v => 
+              v.options && v.options.some(o => 
+                o.name === 'Finish' && o.value.includes('Takeaway')
+              )
+            ))
+          );
+          
+          return isCoffee && (hasTakeaway || !item.name.toLowerCase().includes('eat-in'));
+        });
+
+        // Extract unique coffee types
+        const coffeeTypeMap = new Map();
         
-        // Extract categories
-        const categorySet = new Set();
-        allItems.forEach(item => {
-          const categoryName = item.category?.name || 'Other';
-          categorySet.add(categoryName);
+        allCoffees.forEach(item => {
+          // Clean the name (remove Takeaway prefix)
+          let cleanName = item.name.replace(/^(takeaway|eat-in)\s+/i, '');
+          
+          // Check if we already have this coffee type
+          if (!coffeeTypeMap.has(cleanName.toLowerCase())) {
+            coffeeTypeMap.set(cleanName.toLowerCase(), {
+              ...item,
+              displayName: cleanName,
+              // Store the original product for reference
+              originalProduct: item
+            });
+          }
         });
         
-        // Make sure Coffee is first, followed by other categories
-        const sortedCategories = ['Coffee', ...Array.from(categorySet)
-          .filter(cat => cat !== 'Coffee')
-          .sort()];
+        // Convert map to array and sort by popularity
+        let coffeeList = Array.from(coffeeTypeMap.values());
+        coffeeList.sort((a, b) => {
+          const aIsPopular = popularCoffees.some(coffee => 
+            a.displayName.toLowerCase().includes(coffee.toLowerCase()));
+          const bIsPopular = popularCoffees.some(coffee => 
+            b.displayName.toLowerCase().includes(coffee.toLowerCase()));
+          
+          if (aIsPopular && !bIsPopular) return -1;
+          if (!aIsPopular && bIsPopular) return 1;
+          
+          return a.displayName.localeCompare(b.displayName);
+        });
         
-        setMenuItems(allItems);
-        setCategories(sortedCategories);
+        // Get food items (non-coffee)
+        const foods = data.products.filter(item => {
+          return item.category && item.category.name !== 'Coffee' && 
+                 !item.name.toLowerCase().includes('eat-in');
+        }).slice(0, 6); // Limit to 6 food items
+        
+        setCoffeeItems(coffeeList);
+        setFoodItems(foods);
         setLoading(false);
       } catch (err) {
         console.error('Error fetching menu:', err);
@@ -46,33 +95,16 @@ const Menu = () => {
     };
 
     fetchMenu();
-  }, []);
+  }, [popularCoffees]); // Add dependencies to fix exhaustive-deps warning
 
-  // Filter items by selected category
-  const filteredItems = menuItems.filter(item => {
-    const itemCategory = item.category?.name || 'Other';
-    return itemCategory === selectedCategory;
-  });
+  const handleCoffeeSelect = (coffee) => {
+    setSelectedCoffee(coffee);
+    setIsCustomizing(true);
+  };
 
-  // Common coffee drink types to prioritize
-  const popularCoffees = [
-    'Latte', 'Cappuccino', 'Flat White', 'Americano', 
-    'Espresso', 'Mocha', 'Cortado', 'Macchiato'
-  ];
-  
-  // Sort coffee items to prioritize popular drinks
-  const sortedItems = [...filteredItems].sort((a, b) => {
-    if (selectedCategory === 'Coffee') {
-      const aIsPopular = popularCoffees.some(coffee => 
-        a.name.toLowerCase().includes(coffee.toLowerCase()));
-      const bIsPopular = popularCoffees.some(coffee => 
-        b.name.toLowerCase().includes(coffee.toLowerCase()));
-      
-      if (aIsPopular && !bIsPopular) return -1;
-      if (!aIsPopular && bIsPopular) return 1;
-    }
-    return a.name.localeCompare(b.name);
-  });
+  const handleCloseCustomization = () => {
+    setIsCustomizing(false);
+  };
 
   if (loading) {
     return (
@@ -97,42 +129,43 @@ const Menu = () => {
   }
 
   return (
-    <div className="py-6">
+    <div className="py-6 px-4">
       <h1 className="text-3xl font-bold mb-2 text-center">Middle Street Coffee</h1>
       <p className="text-center mb-6">Order for takeaway</p>
       
-      {/* Category tabs */}
-      <div className="flex overflow-x-auto pb-4 mb-6 justify-center">
-        {categories.map(category => (
-          <button
-            key={category}
-            className={`whitespace-nowrap px-6 py-2 mx-1 rounded-full 
-              ${selectedCategory === category 
-                ? 'bg-black text-white' 
-                : 'bg-gray-200 hover:bg-gray-300'}`}
-            onClick={() => setSelectedCategory(category)}
-          >
-            {category}
-          </button>
+      {/* Coffee section */}
+      <h2 className="text-xl font-semibold mb-4">Coffee</h2>
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
+        {coffeeItems.map(coffee => (
+          <CoffeeCard 
+            key={coffee.uuid} 
+            coffee={coffee} 
+            onSelect={() => handleCoffeeSelect(coffee)}
+          />
         ))}
       </div>
       
-      {/* Product grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {sortedItems.map(item => {
-          if (selectedCategory === 'Coffee') {
-            return <CoffeeProductCard key={item.id || item.uuid} product={item} />;
-          } else {
-            return <ProductCard key={item.id || item.uuid} product={item} />;
-          }
-        })}
-      </div>
+      {/* Food Add-ons section */}
+      {foodItems.length > 0 && (
+        <>
+          <h2 className="text-xl font-semibold mb-4">Add Something Tasty</h2>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            {foodItems.map(food => (
+              <AddOnCard 
+                key={food.uuid} 
+                item={food}
+              />
+            ))}
+          </div>
+        </>
+      )}
       
-      {/* Empty state */}
-      {sortedItems.length === 0 && (
-        <div className="text-center py-10">
-          <p>No products available in this category.</p>
-        </div>
+      {/* Customization Modal */}
+      {isCustomizing && selectedCoffee && (
+        <CustomizationModal 
+          coffee={selectedCoffee}
+          onClose={handleCloseCustomization}
+        />
       )}
     </div>
   );
