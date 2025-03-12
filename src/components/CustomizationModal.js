@@ -12,23 +12,21 @@ const CustomizationModal = ({ coffee, onClose }) => {
   // Extract available options from the coffee product
   const [milkOptions] = useState(() => {
     // Default milk options
-    const milks = ['Dairy', 'Oat', 'Soy', 'Almond'];
-    // Default caffeination options
-    const caffeination = [true, false];
+    const defaultMilks = ['Dairy', 'Oat', 'Soy', 'Almond'];
     
     // Check if the product has specific variants with options
-    if (coffee.variants && coffee.variants.length > 0) {
+    if (coffee && coffee.variants && coffee.variants.length > 0) {
       // Extract milk options from variants
       const milkSet = new Set();
       const caffeinationSet = new Set();
       
       coffee.variants.forEach(variant => {
-        if (variant.options) {
+        if (variant && variant.options) {
           variant.options.forEach(option => {
-            if (option.name === 'flavour') {
+            if (option && option.name === 'flavour' && option.value) {
               milkSet.add(option.value);
             }
-            if (option.name === 'Style') {
+            if (option && option.name === 'Style' && option.value) {
               // Handle caffeination style
               const isDecaf = option.value.trim().toLowerCase().includes('decaf');
               caffeinationSet.add(!isDecaf);
@@ -46,34 +44,41 @@ const CustomizationModal = ({ coffee, onClose }) => {
       }
     }
     
-    return { milks, caffeination };
+    return { milks: defaultMilks, caffeination: [true, false] };
   });
 
   // Calculate price based on selections
   useEffect(() => {
+    if (!coffee) {
+      setPrice(0);
+      return;
+    }
+    
     // Start with base price
     let basePrice = coffee.price || 0;
     
     // Try to find matching variant with selected options
     if (coffee.variants && coffee.variants.length > 0) {
       const matchingVariant = coffee.variants.find(variant => {
-        if (!variant.options) return false;
+        if (!variant || !variant.options) return false;
         
         const hasMilk = variant.options.some(opt => 
-          opt.name === 'flavour' && opt.value === milkType
+          opt && opt.name === 'flavour' && opt.value === milkType
         );
         
         const styleName = isCaffeinated ? 'Caffeinated' : 'Decaffeinated';
         const hasCaffeination = variant.options.some(opt => 
-          opt.name === 'Style' && opt.value.includes(styleName)
+          opt && opt.name === 'Style' && 
+          opt.value && opt.value.includes(styleName)
         );
         
         const hasTakeaway = variant.options.some(opt => 
-          opt.name === 'Finish' && opt.value.includes('Takeaway')
+          opt && opt.name === 'Finish' && 
+          opt.value && opt.value.includes('Takeaway')
         );
         
         // For variants with Finish, must be takeaway
-        if (variant.options.some(opt => opt.name === 'Finish')) {
+        if (variant.options.some(opt => opt && opt.name === 'Finish')) {
           return hasMilk && hasCaffeination && hasTakeaway;
         }
         
@@ -81,9 +86,9 @@ const CustomizationModal = ({ coffee, onClose }) => {
         return hasMilk && hasCaffeination;
       });
       
-      if (matchingVariant && matchingVariant.price) {
+      if (matchingVariant && matchingVariant.price && matchingVariant.price.amount) {
         basePrice = matchingVariant.price.amount;
-      } else if (coffee.variants[0].price) {
+      } else if (coffee.variants[0] && coffee.variants[0].price && coffee.variants[0].price.amount) {
         // Fallback to first variant price
         basePrice = coffee.variants[0].price.amount;
       }
@@ -102,11 +107,19 @@ const CustomizationModal = ({ coffee, onClose }) => {
     setPrice(calculatedPrice);
   }, [coffee, milkType, isCaffeinated, selectedSize]);
 
+  // Handle null coffee
+  if (!coffee) {
+    return null;
+  }
+
   const handleAddToCart = () => {
+    // Safely get the display name
+    const displayName = (coffee.displayName || coffee.name || 'Coffee').replace(/^(takeaway|eat-in)\s+/i, '');
+    
     // Create the item for cart
     const item = {
-      id: coffee.uuid,
-      name: buildItemName(),
+      id: coffee.uuid || coffee.id || `coffee-${Date.now()}`,
+      name: buildItemName(displayName),
       price: price,
       options: {
         milk: milkType,
@@ -121,8 +134,8 @@ const CustomizationModal = ({ coffee, onClose }) => {
     onClose();
   };
 
-  const buildItemName = () => {
-    let name = coffee.displayName || coffee.name;
+  const buildItemName = (baseName) => {
+    let name = baseName || 'Coffee';
     
     // Add size if not regular
     if (selectedSize !== 'Regular') {
@@ -147,7 +160,9 @@ const CustomizationModal = ({ coffee, onClose }) => {
       <div className="bg-white rounded-lg shadow-lg w-full max-w-md">
         <div className="p-6">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-2xl font-bold">{coffee.displayName}</h2>
+            <h2 className="text-2xl font-bold">
+              {(coffee.displayName || coffee.name || 'Coffee').replace(/^(takeaway|eat-in)\s+/i, '')}
+            </h2>
             <button onClick={onClose} className="text-gray-600 hover:text-gray-800">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />

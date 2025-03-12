@@ -30,21 +30,28 @@ const Menu = () => {
         }
 
         console.log(`Received ${data.products.length} products from API`);
-       
+        
+        // Make sure items have all required properties
+        const validProducts = data.products.filter(item => item && item.name);
         
         // Filter coffee products
-        const coffeeProducts = data.products.filter(item => {
-          return item && item.category && item.category.name === 'Coffee';
+        const coffeeProducts = validProducts.filter(item => {
+          return item && 
+                 item.category && 
+                 typeof item.category === 'object' &&
+                 item.category.name === 'Coffee';
         });
         
         console.log(`Found ${coffeeProducts.length} coffee products`);
         setCoffeeItems(coffeeProducts);
         
         // Get food items (non-coffee)
-        const foods = data.products.filter(item => {
-          return item && item.category && 
+        const foods = validProducts.filter(item => {
+          return item && 
+                 item.category && 
+                 typeof item.category === 'object' &&
                  item.category.name !== 'Coffee' && 
-                 !item.name.toLowerCase().includes('eat-in');
+                 (!item.name || !item.name.toLowerCase().includes('eat-in'));
         });
         
         console.log(`Found ${foods.length} food products`);
@@ -110,13 +117,13 @@ const Menu = () => {
           {coffeeItems
             // Sort by popularity
             .sort((a, b) => {
-              const aName = a.name || '';
-              const bName = b.name || '';
+              const aName = (a.name || '').toLowerCase();
+              const bName = (b.name || '').toLowerCase();
               
               const aIsPopular = popularCoffees.some(coffee => 
-                aName.toLowerCase().includes(coffee.toLowerCase()));
+                aName.includes(coffee.toLowerCase()));
               const bIsPopular = popularCoffees.some(coffee => 
-                bName.toLowerCase().includes(coffee.toLowerCase()));
+                bName.includes(coffee.toLowerCase()));
               
               if (aIsPopular && !bIsPopular) return -1;
               if (!aIsPopular && bIsPopular) return 1;
@@ -125,7 +132,7 @@ const Menu = () => {
             })
             .map(coffee => (
               <CoffeeCard 
-                key={coffee.uuid || coffee.id} 
+                key={coffee.uuid || coffee.id || Math.random().toString(36).substring(7)} 
                 coffee={coffee} 
                 onSelect={() => handleCoffeeSelect(coffee)}
               />
@@ -141,7 +148,7 @@ const Menu = () => {
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             {foodItems.map(food => (
               <AddOnCard 
-                key={food.uuid || food.id} 
+                key={food.uuid || food.id || Math.random().toString(36).substring(7)} 
                 item={food}
               />
             ))}
