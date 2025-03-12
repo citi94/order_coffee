@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { getMenuItems } from '../utils/api';
 import CoffeeCard from '../components/CoffeeCard';
 import CustomizationModal from '../components/CustomizationModal';
@@ -13,78 +13,41 @@ const Menu = () => {
   const [isCustomizing, setIsCustomizing] = useState(false);
 
   // Common coffee drinks to focus on
-  const popularCoffees = useMemo(() => [
+  const popularCoffees = [
     'Latte', 'Cappuccino', 'Flat White', 'Americano', 
     'Espresso', 'Mocha', 'Cortado', 'Macchiato', 'Iced Latte'
-  ], []);
+  ];
 
   useEffect(() => {
     const fetchMenu = async () => {
       try {
         setLoading(true);
+        console.log('Fetching menu data...');
         const data = await getMenuItems();
         
         if (!data || !data.products) {
           throw new Error('Invalid data received from API');
         }
 
-        // Process coffee items - focus on takeaway options
-        const allCoffees = data.products.filter(item => {
-          // Check if the item is in the Coffee category
-          const isCoffee = item.category && item.category.name === 'Coffee';
-          
-          // Check if it's a takeaway variant or has takeaway options
-          const hasTakeaway = item.name && (
-            item.name.toLowerCase().includes('takeaway') ||
-            (item.variants && item.variants.some(v => 
-              v.options && v.options.some(o => 
-                o.name === 'Finish' && o.value.includes('Takeaway')
-              )
-            ))
-          );
-          
-          return isCoffee && (hasTakeaway || !item.name.toLowerCase().includes('eat-in'));
-        });
-
-        // Extract unique coffee types
-        const coffeeTypeMap = new Map();
+        console.log(`Received ${data.products.length} products from API`);
+       
         
-        allCoffees.forEach(item => {
-          // Clean the name (remove Takeaway prefix)
-          let cleanName = item.name.replace(/^(takeaway|eat-in)\s+/i, '');
-          
-          // Check if we already have this coffee type
-          if (!coffeeTypeMap.has(cleanName.toLowerCase())) {
-            coffeeTypeMap.set(cleanName.toLowerCase(), {
-              ...item,
-              displayName: cleanName,
-              // Store the original product for reference
-              originalProduct: item
-            });
-          }
+        // Filter coffee products
+        const coffeeProducts = data.products.filter(item => {
+          return item && item.category && item.category.name === 'Coffee';
         });
         
-        // Convert map to array and sort by popularity
-        let coffeeList = Array.from(coffeeTypeMap.values());
-        coffeeList.sort((a, b) => {
-          const aIsPopular = popularCoffees.some(coffee => 
-            a.displayName.toLowerCase().includes(coffee.toLowerCase()));
-          const bIsPopular = popularCoffees.some(coffee => 
-            b.displayName.toLowerCase().includes(coffee.toLowerCase()));
-          
-          if (aIsPopular && !bIsPopular) return -1;
-          if (!aIsPopular && bIsPopular) return 1;
-          
-          return a.displayName.localeCompare(b.displayName);
-        });
+        console.log(`Found ${coffeeProducts.length} coffee products`);
+        setCoffeeItems(coffeeProducts);
         
         // Get food items (non-coffee)
         const foods = data.products.filter(item => {
-          return item.category && item.category.name !== 'Coffee' && 
+          return item && item.category && 
+                 item.category.name !== 'Coffee' && 
                  !item.name.toLowerCase().includes('eat-in');
-        }).slice(0, 6); // Limit to 6 food items
+        });
         
-        setCoffeeItems(coffeeList);
+        console.log(`Found ${foods.length} food products`);
         setFoodItems(foods);
         setLoading(false);
       } catch (err) {
@@ -95,7 +58,7 @@ const Menu = () => {
     };
 
     fetchMenu();
-  }, [popularCoffees]); // Add dependencies to fix exhaustive-deps warning
+  }, []);
 
   const handleCoffeeSelect = (coffee) => {
     setSelectedCoffee(coffee);
@@ -123,6 +86,7 @@ const Menu = () => {
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
           <strong className="font-bold">Error!</strong>
           <span className="block sm:inline"> {error}</span>
+          <p className="mt-2">Please try again later or contact the café directly.</p>
         </div>
       </div>
     );
@@ -135,15 +99,40 @@ const Menu = () => {
       
       {/* Coffee section */}
       <h2 className="text-xl font-semibold mb-4">Coffee</h2>
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
-        {coffeeItems.map(coffee => (
-          <CoffeeCard 
-            key={coffee.uuid} 
-            coffee={coffee} 
-            onSelect={() => handleCoffeeSelect(coffee)}
-          />
-        ))}
-      </div>
+      
+      {coffeeItems.length === 0 ? (
+        <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 p-4 rounded mb-8">
+          <p className="font-medium">Currently unable to display coffee menu</p>
+          <p className="text-sm mt-1">Please check back soon or visit us in store.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
+          {coffeeItems
+            // Sort by popularity
+            .sort((a, b) => {
+              const aName = a.name || '';
+              const bName = b.name || '';
+              
+              const aIsPopular = popularCoffees.some(coffee => 
+                aName.toLowerCase().includes(coffee.toLowerCase()));
+              const bIsPopular = popularCoffees.some(coffee => 
+                bName.toLowerCase().includes(coffee.toLowerCase()));
+              
+              if (aIsPopular && !bIsPopular) return -1;
+              if (!aIsPopular && bIsPopular) return 1;
+              
+              return aName.localeCompare(bName);
+            })
+            .map(coffee => (
+              <CoffeeCard 
+                key={coffee.uuid || coffee.id} 
+                coffee={coffee} 
+                onSelect={() => handleCoffeeSelect(coffee)}
+              />
+            ))
+          }
+        </div>
+      )}
       
       {/* Food Add-ons section */}
       {foodItems.length > 0 && (
@@ -152,12 +141,19 @@ const Menu = () => {
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             {foodItems.map(food => (
               <AddOnCard 
-                key={food.uuid} 
+                key={food.uuid || food.id} 
                 item={food}
               />
             ))}
           </div>
         </>
+      )}
+      
+      {foodItems.length === 0 && coffeeItems.length === 0 && (
+        <div className="text-center py-8">
+          <p className="text-lg mb-2">No products are currently available</p>
+          <p>Please try again later or visit us in store.</p>
+        </div>
       )}
       
       {/* Customization Modal */}
