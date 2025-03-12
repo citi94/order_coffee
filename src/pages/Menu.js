@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import CoffeeProductCard from '../components/CoffeeProductCard';
+import ProductCard from '../components/ProductCard';
 import { getMenuItems } from '../utils/api';
 
 const Menu = () => {
   const [menuItems, setMenuItems] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState('all');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -17,30 +20,17 @@ const Menu = () => {
           throw new Error('Invalid data received from API');
         }
 
-        // First, identify coffee products with their variants
+        // Process menu items and extract categories
         const processedItems = data.products
-          // Sort by name
-          .sort((a, b) => a.name.localeCompare(b.name))
-          // Filter only keep variants in the data structure
-          .map(item => {
-            // If the item doesn't have any variants, but it's a coffee, include it
-            if (!item.variants || item.variants.length === 0) {
-              if (item.category && item.category.name === 'Coffee') {
-                return item;
-              }
-              return null;
-            }
-            
-            // Keep if it's coffee
-            if (item.category && item.category.name === 'Coffee') {
-              return item;
-            }
-            
-            return null;
-          })
-          .filter(item => item !== null);
+          .sort((a, b) => a.name.localeCompare(b.name));
+        
+        const uniqueCategories = [...new Set(processedItems
+          .filter(item => item.category)
+          .map(item => item.category.name || 'Other'))
+        ];
         
         setMenuItems(processedItems);
+        setCategories(uniqueCategories);
         setLoading(false);
       } catch (err) {
         console.error('Error fetching menu:', err);
@@ -51,6 +41,11 @@ const Menu = () => {
 
     fetchMenu();
   }, []);
+
+  // Filter items by selected category
+  const filteredItems = selectedCategory === 'all'
+    ? menuItems
+    : menuItems.filter(item => item.category && item.category.name === selectedCategory);
 
   if (loading) {
     return (
@@ -81,16 +76,47 @@ const Menu = () => {
       <h1 className="text-3xl font-bold mb-6 text-center">Middle Street Coffee</h1>
       <p className="text-center mb-6">Order for takeaway</p>
       
+      {/* Category filters */}
+      {categories.length > 0 && (
+        <div className="flex overflow-x-auto pb-4 mb-6">
+          <button
+            className={`whitespace-nowrap px-4 py-2 rounded-full mr-2 ${
+              selectedCategory === 'all' ? 'bg-black text-white' : 'bg-gray-200'
+            }`}
+            onClick={() => setSelectedCategory('all')}
+          >
+            All Items
+          </button>
+          
+          {categories.map(category => (
+            <button
+              key={category}
+              className={`whitespace-nowrap px-4 py-2 rounded-full mr-2 ${
+                selectedCategory === category ? 'bg-black text-white' : 'bg-gray-200'
+              }`}
+              onClick={() => setSelectedCategory(category)}
+            >
+              {category}
+            </button>
+          ))}
+        </div>
+      )}
+      
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {menuItems.map(item => (
-          <CoffeeProductCard key={item.uuid} product={item} />
-        ))}
+        {filteredItems.map(item => {
+          // Use CoffeeProductCard for coffee items, ProductCard for others
+          if (item.category && item.category.name === 'Coffee') {
+            return <CoffeeProductCard key={item.id || item.uuid} product={item} />;
+          } else {
+            return <ProductCard key={item.id || item.uuid} product={item} />;
+          }
+        })}
       </div>
       
       {/* If no items are displayed */}
-      {menuItems.length === 0 && (
+      {filteredItems.length === 0 && (
         <div className="text-center py-10">
-          <p>No coffee products available.</p>
+          <p>No products available in this category.</p>
         </div>
       )}
     </div>

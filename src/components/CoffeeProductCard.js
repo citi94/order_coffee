@@ -5,7 +5,6 @@ const CoffeeProductCard = ({ product }) => {
   const { addToCart } = useCart();
   const [quantity, setQuantity] = useState(1);
   const [selectedOptions, setSelectedOptions] = useState({});
-  const [isTakeaway, setIsTakeaway] = useState(true);
   const [displayName, setDisplayName] = useState('');
 
   // Process the product name on mount
@@ -14,10 +13,8 @@ const CoffeeProductCard = ({ product }) => {
     let name = product.name;
     if (name.startsWith('Takeaway ')) {
       name = name.replace('Takeaway ', '');
-      setIsTakeaway(true);
     } else if (name.startsWith('Eat-In ')) {
       name = name.replace('Eat-In ', '');
-      setIsTakeaway(false);
     }
     setDisplayName(name);
   }, [product.name]);

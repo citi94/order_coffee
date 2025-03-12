@@ -7,7 +7,6 @@ import Checkout from './pages/Checkout';
 import OrderConfirmation from './pages/OrderConfirmation';
 import { CartProvider } from './context/CartContext';
 import './App.css';
-import CoffeeProductCard from './components/CoffeeProductCard';
 
 function App() {
   return (
