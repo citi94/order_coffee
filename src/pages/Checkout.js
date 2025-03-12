@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { createOrder, initiatePayment } from '../utils/api';
@@ -14,7 +14,7 @@ const Checkout = () => {
   const [error, setError] = useState(null);
 
   // Redirect to menu if cart is empty
-  React.useEffect(() => {
+  useEffect(() => {
     if (items.length === 0) {
       navigate('/');
     }
@@ -114,14 +114,20 @@ const Checkout = () => {
         totalAmount
       };
       
+      console.log('Sending order data:', orderData);
+      
       // Create order in Zettle
       const orderResponse = await createOrder(orderData);
       
+      console.log('Order creation response:', orderResponse);
+      
       if (!orderResponse || !orderResponse.orderId) {
-        throw new Error('Failed to create order');
+        throw new Error(orderResponse?.message || 'Failed to create order');
       }
       
-      // Then initiate payment
+      // Then initiate payment - for testing, we'll skip this step
+      // and go directly to confirmation
+      /*
       const paymentResponse = await initiatePayment({
         orderId: orderResponse.orderId,
         amount: totalAmount
@@ -131,24 +137,26 @@ const Checkout = () => {
       if (paymentResponse.paymentUrl) {
         // For Apple Pay / Google Pay, we'll handle in the browser
         window.location.href = paymentResponse.paymentUrl;
+        return;
       } else {
         // Save the payment ID to check status later
         localStorage.setItem('currentPaymentId', paymentResponse.paymentId);
-        
-        // Clear cart and go to confirmation page
-        clearCart();
-        navigate('/confirmation', { 
-          state: { 
-            orderId: orderResponse.orderId,
-            orderNumber: orderResponse.orderNumber,
-            pickupTime: pickupTime,
-            customerName: name
-          } 
-        });
       }
+      */
+      
+      // Skip payment for now and go to confirmation
+      clearCart();
+      navigate('/confirmation', { 
+        state: { 
+          orderId: orderResponse.orderId,
+          orderNumber: orderResponse.orderNumber,
+          pickupTime: pickupTime,
+          customerName: name
+        } 
+      });
     } catch (err) {
       console.error('Checkout error:', err);
-      setError('There was an error processing your order. Please try again.');
+      setError(`Error: ${err.message || 'There was an error processing your order. Please try again.'}`);
     } finally {
       setLoading(false);
     }
