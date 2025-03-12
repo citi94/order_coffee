@@ -14,7 +14,7 @@ exports.handler = async function (event, context) {
   }
 
   try {
-    // Get access token - using the same method as your working display app
+    // Get access token
     const tokenResponse = await fetch('https://oauth.zettle.com/token', {
       method: 'POST',
       headers: {
@@ -35,22 +35,41 @@ exports.handler = async function (event, context) {
       throw new Error('Failed to obtain access token');
     }
 
-    // In a real implementation, you would check the payment status with Zettle
-    // or in your own database where you're tracking payments
-    
-    // For this demonstration, we'll simulate a successful payment
-    // In a real app, you would verify with the payment provider
+    // Check payment status
+    const paymentResponse = await fetch(`https://purchase.izettle.com/purchases/v2/payments/${paymentId}`, {
+      headers: {
+        'Authorization': `Bearer ${access_token}`
+      }
+    });
 
-    // Simulate a successful payment
-    const simulatedOrderId = `order_${paymentId.substr(4, 8)}`;
-    const simulatedOrderNumber = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+    const paymentData = await paymentResponse.json();
+
+    // Extract the order details from the payment
+    const paymentStatus = paymentData.status || 'PENDING';
+    const orderId = paymentData.purchaseUUID;
+    
+    // Get order details if payment is successful
+    let orderDetails = {};
+    if (paymentStatus === 'PAID' && orderId) {
+      const orderResponse = await fetch(`https://purchase.izettle.com/purchases/v2/${orderId}`, {
+        headers: {
+          'Authorization': `Bearer ${access_token}`
+        }
+      });
+      const orderData = await orderResponse.json();
+      orderDetails = {
+        orderId: orderData.purchaseUUID,
+        orderNumber: orderData.purchaseNumber || 'N/A'
+      };
+    }
 
     return {
       statusCode: 200,
       body: JSON.stringify({
-        status: 'COMPLETED', // or 'PENDING', 'FAILED'
-        orderId: simulatedOrderId,
-        orderNumber: simulatedOrderNumber
+        status: paymentStatus === 'PAID' ? 'COMPLETED' : 
+                paymentStatus === 'FAILED' ? 'FAILED' : 'PENDING',
+        orderId: orderDetails.orderId || orderId,
+        orderNumber: orderDetails.orderNumber || `${Date.now().toString().slice(-6)}`
       })
     };
   } catch (error) {

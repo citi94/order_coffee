@@ -21,7 +21,7 @@ exports.handler = async function (event, context) {
       };
     }
 
-    // Get access token - using the same method as your working display app
+    // Get access token from Zettle
     const tokenResponse = await fetch('https://oauth.zettle.com/token', {
       method: 'POST',
       headers: {
@@ -42,28 +42,38 @@ exports.handler = async function (event, context) {
       throw new Error('Failed to obtain access token');
     }
 
-    // Note: In a production implementation, you would integrate with the Zettle Payment API
-    // to handle Apple Pay / Google Pay. For this demonstration, we'll simulate the payment process.
-    
-    // For a real implementation, you would:
-    // 1. Create a payment session with Zettle
-    // 2. Return the session details to initialize Apple Pay / Google Pay
-    // 3. Handle the payment completion
+    // Create a payment link for the order
+    const paymentLinkResponse = await fetch('https://purchase.izettle.com/purchases/v2/payments', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${access_token}`
+      },
+      body: JSON.stringify({
+        purchaseUUID: orderId,
+        amount: {
+          amount: amount,
+          currencyId: "GBP"
+        },
+        title: "Coffee Order",
+        redirectUrl: `${process.env.URL}/confirmation?orderId=${orderId}`,
+        reference: `order_${Date.now()}`
+      })
+    });
 
-    // Simulate payment creation
-    const paymentId = `pay_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const paymentData = await paymentLinkResponse.json();
 
-    // In a real implementation, you would store this payment in a database
-    // along with its status and the order ID
+    if (!paymentData.paymentUUID) {
+      console.error('Payment link creation failed:', paymentData);
+      throw new Error('Failed to create payment link');
+    }
 
     return {
       statusCode: 200,
       body: JSON.stringify({
         status: 'success',
-        paymentId,
-        // In a real implementation, this might be a URL to redirect to for payment
-        // or details to initialize a payment sheet in the browser
-        paymentUrl: null
+        paymentId: paymentData.paymentUUID,
+        paymentUrl: paymentData.paymentUrl
       })
     };
   } catch (error) {
