@@ -8,3 +8,9 @@
   from = "/*"
   to = "/index.html"
   status = 200
+
+# Special redirect for Apple Pay domain validation
+[[redirects]]
+  from = "/.well-known/apple-developer-merchantid-domain-association"
+  to = "/.netlify/functions/apple-pay-validation"
+  status = 200

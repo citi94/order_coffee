@@ -1,7 +1,9 @@
+// src/pages/Checkout.js
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
-import { createOrder, initiatePayment } from '../utils/api';
+import { createOrder } from '../utils/api';
+import ZettlePayment from '../components/ZettlePayment';
 
 const Checkout = () => {
   const navigate = useNavigate();
@@ -12,6 +14,8 @@ const Checkout = () => {
   const [note, setNote] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [orderCreated, setOrderCreated] = useState(false);
+  const [orderDetails, setOrderDetails] = useState(null);
 
   // Redirect to menu if cart is empty
   useEffect(() => {
@@ -71,7 +75,7 @@ const Checkout = () => {
     return formattedOptions.join(', ');
   };
 
-  const handleSubmit = async (e) => {
+  const handleCreateOrder = async (e) => {
     e.preventDefault();
     
     if (loading) return;
@@ -125,39 +129,20 @@ const Checkout = () => {
         throw new Error(orderResponse?.message || 'Failed to create order');
       }
       
-      // Then initiate payment - for testing, we'll skip this step
-      // and go directly to confirmation
-      /*
-      const paymentResponse = await initiatePayment({
+      // Store order details and show payment options
+      setOrderDetails({
         orderId: orderResponse.orderId,
-        amount: totalAmount
+        orderNumber: orderResponse.orderNumber,
+        customerName: name,
+        pickupTime: pickupTime
       });
       
-      // For Apple Pay / Google Pay support
-      if (paymentResponse.paymentUrl) {
-        // For Apple Pay / Google Pay, we'll handle in the browser
-        window.location.href = paymentResponse.paymentUrl;
-        return;
-      } else {
-        // Save the payment ID to check status later
-        localStorage.setItem('currentPaymentId', paymentResponse.paymentId);
-      }
-      */
+      setOrderCreated(true);
+      setLoading(false);
       
-      // Skip payment for now and go to confirmation
-      clearCart();
-      navigate('/confirmation', { 
-        state: { 
-          orderId: orderResponse.orderId,
-          orderNumber: orderResponse.orderNumber,
-          pickupTime: pickupTime,
-          customerName: name
-        } 
-      });
     } catch (err) {
-      console.error('Checkout error:', err);
+      console.error('Order creation error:', err);
       setError(`Error: ${err.message || 'There was an error processing your order. Please try again.'}`);
-    } finally {
       setLoading(false);
     }
   };
@@ -192,88 +177,116 @@ const Checkout = () => {
           </div>
         </div>
         
-        {/* Customer information */}
+        {/* Customer information or Payment */}
         <div className="bg-white rounded-lg shadow-md p-6">
-          <h2 className="text-xl font-semibold mb-4">Pickup Details</h2>
-          
-          <form onSubmit={handleSubmit}>
-            <div className="mb-4">
-              <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
-                Name <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                id="name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full border rounded p-2"
-                required
-                placeholder="Your name for the order"
-              />
-            </div>
-            
-            <div className="mb-4">
-              <label htmlFor="pickupTime" className="block text-sm font-medium text-gray-700 mb-1">
-                Pickup Time <span className="text-red-500">*</span>
-              </label>
-              <select
-                id="pickupTime"
-                value={pickupTime}
-                onChange={(e) => setPickupTime(e.target.value)}
-                className="w-full border rounded p-2"
-                required
-              >
-                <option value="">Select pickup time</option>
-                {pickupTimes.map(time => (
-                  <option key={time} value={time}>{time}</option>
-                ))}
-              </select>
-            </div>
-            
-            <div className="mb-4">
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-                Email (optional)
-              </label>
-              <input
-                type="email"
-                id="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full border rounded p-2"
-                placeholder="For receipt (optional)"
-              />
-            </div>
-            
-            <div className="mb-4">
-              <label htmlFor="note" className="block text-sm font-medium text-gray-700 mb-1">
-                Order Note (optional)
-              </label>
-              <textarea
-                id="note"
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                className="w-full border rounded p-2"
-                rows="2"
-                placeholder="Any special requests"
-              />
-            </div>
-            
-            {error && (
-              <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4" role="alert">
-                {error}
+          {!orderCreated ? (
+            // Step 1: Collect customer info
+            <>
+              <h2 className="text-xl font-semibold mb-4">Pickup Details</h2>
+              
+              <form onSubmit={handleCreateOrder}>
+                <div className="mb-4">
+                  <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
+                    Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    id="name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="w-full border rounded p-2"
+                    required
+                    placeholder="Your name for the order"
+                  />
+                </div>
+                
+                <div className="mb-4">
+                  <label htmlFor="pickupTime" className="block text-sm font-medium text-gray-700 mb-1">
+                    Pickup Time <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    id="pickupTime"
+                    value={pickupTime}
+                    onChange={(e) => setPickupTime(e.target.value)}
+                    className="w-full border rounded p-2"
+                    required
+                  >
+                    <option value="">Select pickup time</option>
+                    {pickupTimes.map(time => (
+                      <option key={time} value={time}>{time}</option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div className="mb-4">
+                  <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+                    Email (optional)
+                  </label>
+                  <input
+                    type="email"
+                    id="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full border rounded p-2"
+                    placeholder="For receipt (optional)"
+                  />
+                </div>
+                
+                <div className="mb-4">
+                  <label htmlFor="note" className="block text-sm font-medium text-gray-700 mb-1">
+                    Order Note (optional)
+                  </label>
+                  <textarea
+                    id="note"
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    className="w-full border rounded p-2"
+                    rows="2"
+                    placeholder="Any special requests"
+                  />
+                </div>
+                
+                {error && (
+                  <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4" role="alert">
+                    {error}
+                  </div>
+                )}
+                
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className={`w-full bg-black text-white py-3 rounded font-medium hover:bg-gray-800 transition ${
+                    loading ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
+                >
+                  {loading ? 'Processing...' : 'Continue to Payment'}
+                </button>
+              </form>
+            </>
+          ) : (
+            // Step 2: Payment options
+            <>
+              <h2 className="text-xl font-semibold mb-4">Payment</h2>
+              <div className="mb-4 p-3 bg-gray-100 rounded">
+                <p className="font-medium">Order #{orderDetails.orderNumber}</p>
+                <p className="text-sm">Pickup time: {orderDetails.pickupTime}</p>
+                <p className="text-sm">Name: {orderDetails.customerName}</p>
               </div>
-            )}
-            
-            <button
-              type="submit"
-              disabled={loading}
-              className={`w-full bg-black text-white py-3 rounded font-medium hover:bg-gray-800 transition ${
-                loading ? 'opacity-50 cursor-not-allowed' : ''
-              }`}
-            >
-              {loading ? 'Processing...' : 'Pay Now'}
-            </button>
-          </form>
+              
+              <ZettlePayment 
+                orderId={orderDetails.orderId} 
+                amount={totalAmount} 
+                customerName={orderDetails.customerName}
+              />
+              
+              <button
+                onClick={() => setOrderCreated(false)}
+                className="mt-4 text-sm text-gray-600 underline hover:text-gray-800"
+              >
+                Go back to edit details
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>
