@@ -139,6 +139,8 @@ const DirectCheckout = () => {
           totalAmount,
           createdAt: new Date().toISOString()
         }));
+
+        clearCart();
         
         // Redirect to Zettle payment page
         setRedirectUrl(response.data.paymentUrl);
