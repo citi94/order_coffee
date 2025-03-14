@@ -161,6 +161,7 @@ const OrderConfirmation = () => {
             <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded mb-4">
               <p className="font-bold">TEST ORDER</p>
               <p>This was a test order and no payment was processed.</p>
+              <p className="text-sm mt-2">Order has been sent to the barista display.</p>
             </div>
           )}
           

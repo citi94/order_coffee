@@ -1,4 +1,3 @@
-// Simplified DirectCheckout component for test orders
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
@@ -22,55 +21,15 @@ const DirectCheckout = () => {
   }, [items, navigate]);
 
   // Generate pickup time options (every 10 minutes for the next 2 hours)
-  const generatePickupTimes = () => {
-    const times = [];
-    const now = new Date();
-    const startTime = new Date(now);
-    
-    // Round current time up to the nearest 10 minutes
-    const minutes = now.getMinutes();
-    const remainder = minutes % 10;
-    const minutesToAdd = remainder === 0 ? 10 : 10 - remainder;
-    
-    startTime.setMinutes(now.getMinutes() + minutesToAdd);
-    startTime.setSeconds(0);
-    startTime.setMilliseconds(0);
-    
-    // Generate times for next 2 hours in 10-minute increments
-    for (let i = 0; i < 12; i++) {
-      const time = new Date(startTime);
-      time.setMinutes(time.getMinutes() + (i * 10));
-      
-      // Format time as HH:MM
-      const hours = time.getHours().toString().padStart(2, '0');
-      const mins = time.getMinutes().toString().padStart(2, '0');
-      const timeString = `${hours}:${mins}`;
-      
-      times.push(timeString);
-    }
-    
-    return times;
-  };
-  
-  const pickupTimes = generatePickupTimes();
-
-  const formatItemOptions = (options) => {
-    const formattedOptions = [];
-    
-    if (options.size && options.size !== 'Regular') {
-      formattedOptions.push(options.size);
-    }
-    
-    if (options.milk && options.milk !== 'Dairy') {
-      formattedOptions.push(`${options.milk} milk`);
-    }
-    
-    if (options.caffeinated === false) {
-      formattedOptions.push('Decaf');
-    }
-    
-    return formattedOptions.join(', ');
-  };
+  const pickupTimes = [];
+  const now = new Date();
+  for (let i = 0; i < 12; i++) {
+    const time = new Date(now);
+    time.setMinutes(now.getMinutes() + (i * 10));
+    const hours = time.getHours().toString().padStart(2, '0');
+    const mins = time.getMinutes().toString().padStart(2, '0');
+    pickupTimes.push(`${hours}:${mins}`);
+  }
 
   const handleSubmitOrder = async (e) => {
     e.preventDefault();
@@ -99,19 +58,13 @@ const DirectCheckout = () => {
         customerName: name,
         customerEmail: email,
         comment: formattedNote,
-        items: items.map(item => {
-          // Format options as comment
-          const optionsText = formatItemOptions(item.options);
-          
-          return {
-            id: item.id,
-            name: item.name,
-            quantity: item.quantity,
-            unitPrice: item.price,
-            options: item.options,
-            comment: optionsText
-          };
-        }),
+        items: items.map(item => ({
+          id: item.id,
+          name: item.name,
+          quantity: item.quantity,
+          unitPrice: item.price,
+          options: item.options,
+        })),
         totalAmount
       };
       
@@ -156,22 +109,15 @@ const DirectCheckout = () => {
         {/* Order summary */}
         <div className="bg-white rounded-lg shadow-md p-6">
           <h2 className="text-xl font-semibold mb-4">Order Summary</h2>
-          
           {items.map((item, index) => (
             <div key={index} className="flex justify-between py-2 border-b last:border-b-0">
               <div>
                 <span className="font-medium">{item.quantity}x </span>
                 {item.name}
-                {Object.keys(item.options || {}).length > 0 && (
-                  <div className="text-sm text-gray-600">
-                    {formatItemOptions(item.options)}
-                  </div>
-                )}
               </div>
               <div>£{((item.price * item.quantity) / 100).toFixed(2)}</div>
             </div>
           ))}
-          
           <div className="flex justify-between mt-4 pt-4 border-t font-semibold">
             <div>Total</div>
             <div>£{(totalAmount / 100).toFixed(2)}</div>

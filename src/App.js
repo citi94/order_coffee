@@ -19,7 +19,7 @@ function App() {
             <Routes>
               <Route path="/" element={<Menu />} />
               <Route path="/cart" element={<Cart />} />
-              <Route path="/checkout" element={<DirectCheckout />} /> {/* Changed from Checkout */}
+              <Route path="/DirectCheckout" element={<DirectCheckout />} /> {/* Changed from Checkout */}
               <Route path="/confirmation" element={<OrderConfirmation />} />
             </Routes>
           </main>
