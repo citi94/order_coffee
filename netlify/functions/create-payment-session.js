@@ -47,7 +47,7 @@ exports.handler = async function (event, context) {
       },
       title: "Coffee Order",
       reference: `coffee-order-${Date.now()}`,
-      redirectUrl: `${process.env.URL}/confirmation`,
+      redirectUrl: `${process.env.SITE_URL}/confirmation?orderId=${orderId}`,
       metadata: {
         customerName: orderData.customerName || '',
         customerEmail: orderData.customerEmail || '',

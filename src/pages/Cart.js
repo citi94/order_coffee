@@ -119,7 +119,7 @@ const Cart = () => {
         </Link>
         
         <button
-          onClick={() => navigate('/checkout')}
+          onClick={() => navigate('/DirectCheckout')}
           className="bg-black text-white px-8 py-2 rounded hover:bg-gray-800 transition"
         >
           Checkout

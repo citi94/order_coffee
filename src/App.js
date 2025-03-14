@@ -1,9 +1,10 @@
+// src/App.js
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Menu from './pages/Menu';
 import Cart from './pages/Cart';
-import Checkout from './pages/Checkout';
+import DirectCheckout from './pages/DirectCheckout'; // Use DirectCheckout instead
 import OrderConfirmation from './pages/OrderConfirmation';
 import { CartProvider } from './context/CartContext';
 import './App.css';
@@ -18,7 +19,7 @@ function App() {
             <Routes>
               <Route path="/" element={<Menu />} />
               <Route path="/cart" element={<Cart />} />
-              <Route path="/checkout" element={<Checkout />} />
+              <Route path="/checkout" element={<DirectCheckout />} /> {/* Changed from Checkout */}
               <Route path="/confirmation" element={<OrderConfirmation />} />
             </Routes>
           </main>
