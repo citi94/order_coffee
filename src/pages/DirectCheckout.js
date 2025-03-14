@@ -1,8 +1,7 @@
-// src/pages/DirectCheckout.js - REVISED APPROACH
+// src/pages/DirectCheckout.js
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
-import axios from 'axios';
 
 const DirectCheckout = () => {
   const navigate = useNavigate();
@@ -74,6 +73,7 @@ const DirectCheckout = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    console.log("Form submitted");
     
     if (loading) return;
     
@@ -118,16 +118,23 @@ const DirectCheckout = () => {
       
       console.log('Submitting order data directly to Zettle:', orderData);
       
-      // Create order directly without payment
-      const response = await axios.post('/.netlify/functions/create-order', orderData);
+      // Use fetch instead of axios for simpler error handling
+      const response = await fetch('/.netlify/functions/create-order', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(orderData),
+      });
       
-      console.log('Order creation response:', response.data);
+      const data = await response.json();
+      console.log('Order creation response:', data);
       
-      if (response.data.status === 'success') {
+      if (data.status === 'success') {
         // Store order info in local storage for confirmation page
         localStorage.setItem('pendingOrder', JSON.stringify({
-          orderId: response.data.orderId,
-          orderNumber: response.data.orderNumber,
+          orderId: data.orderId,
+          orderNumber: data.orderNumber,
           customerName: name,
           pickupTime,
           items,
@@ -141,15 +148,15 @@ const DirectCheckout = () => {
         // Navigate to confirmation page
         navigate('/confirmation', { 
           state: { 
-            orderId: response.data.orderId,
-            orderNumber: response.data.orderNumber,
+            orderId: data.orderId,
+            orderNumber: data.orderNumber,
             customerName: name,
             pickupTime,
             isTestOrder: true
           }
         });
       } else {
-        throw new Error(response.data.message || 'Failed to create order');
+        throw new Error(data.message || 'Failed to create order');
       }
     } catch (err) {
       console.error('Checkout error:', err);

@@ -22,7 +22,8 @@ const OrderConfirmation = () => {
           orderId: orderId,
           orderNumber: orderId.slice(-6),
           pickupTime: orderData.pickupTime,
-          customerName: orderData.customerName
+          customerName: orderData.customerName,
+          isTestOrder: orderData.isTestOrder
         });
         setStatus('success');
         // Clear the pending order from localStorage
@@ -37,7 +38,8 @@ const OrderConfirmation = () => {
         orderId: location.state.orderId,
         orderNumber: location.state.orderNumber,
         pickupTime: location.state.pickupTime,
-        customerName: location.state.customerName
+        customerName: location.state.customerName,
+        isTestOrder: location.state.isTestOrder
       });
       setStatus('success'); // Assume success if we have order details
     } else {
@@ -89,8 +91,6 @@ const OrderConfirmation = () => {
     const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
     return now.toLocaleDateString('en-GB', options);
   };
-
-  // Rest of your component remains the same...
   
   if (status === 'processing') {
     return (
@@ -156,6 +156,14 @@ const OrderConfirmation = () => {
         </div>
         
         <div className="p-6">
+          {/* Test order indicator */}
+          {(orderDetails?.isTestOrder || location.state?.isTestOrder) && (
+            <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded mb-4">
+              <p className="font-bold">TEST ORDER</p>
+              <p>This was a test order and no payment was processed.</p>
+            </div>
+          )}
+          
           <div className="mb-6">
             <div className="text-5xl mb-4">✅</div>
             <p className="text-lg font-bold mb-1">
@@ -189,12 +197,7 @@ const OrderConfirmation = () => {
           </Link>
           
           <div className="mt-4 text-xs text-gray-500">
-            Order ID: {(orderDetails?.isTestOrder || location.state?.isTestOrder) && (
-  <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded mb-4">
-    <p className="font-bold">TEST ORDER</p>
-    <p>This was a test order and no payment was processed.</p>
-  </div>
-)}
+            Order ID: {orderDetails?.orderId}
           </div>
         </div>
       </div>
