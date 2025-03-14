@@ -189,9 +189,10 @@ const OrderConfirmation = () => {
           </Link>
           
           <div className="mt-4 text-xs text-gray-500">
-            Order ID: {orderDetails?.isTestOrder && (
-  <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-2 rounded mb-4">
-    TEST ORDER - No payment was processed
+            Order ID: {(orderDetails?.isTestOrder || location.state?.isTestOrder) && (
+  <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded mb-4">
+    <p className="font-bold">TEST ORDER</p>
+    <p>This was a test order and no payment was processed.</p>
   </div>
 )}
           </div>

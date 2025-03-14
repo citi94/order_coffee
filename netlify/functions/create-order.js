@@ -10,13 +10,12 @@ exports.handler = async function (event, context) {
   }
 
   try {
+    console.log('===== CREATE ORDER FUNCTION =====');
     const orderData = JSON.parse(event.body);
     console.log('Received order data:', JSON.stringify(orderData, null, 2));
     
-    // Mark this as a test order for demonstration purposes
-    const isTestOrder = orderData.isTestOrder || true; // Default to test mode for now
-    
-    // Get access token
+    // Get access token using JWT Bearer method
+    console.log('Getting Zettle access token...');
     const tokenResponse = await fetch('https://oauth.zettle.com/token', {
       method: 'POST',
       headers: {
@@ -37,15 +36,17 @@ exports.handler = async function (event, context) {
       throw new Error('Failed to obtain access token');
     }
     
+    console.log('Successfully obtained access token');
+
     // Create a uniqueId for this purchase
     const purchaseUUID = `order-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-    
-    // Format for Zettle purchase API
+
+    // Prepare order data - format for the Zettle Purchase API
     const zettleOrder = {
       purchaseUUID: purchaseUUID,
-      source: "ONLINE_ORDER", // Identify this as coming from your web app
+      source: "ONLINE_ORDER",
       products: orderData.items.map(item => ({
-        productUuid: item.id || "test-product-id", // Fallback to test product if no ID
+        productUuid: item.id || "test-product-id", // Fallback to test product
         name: item.name,
         quantity: item.quantity,
         unitPrice: {
@@ -61,15 +62,15 @@ exports.handler = async function (event, context) {
       })),
       // Add metadata
       metadata: {
-        customerName: orderData.customerName || 'Test Customer',
+        customerName: orderData.customerName || '',
         customerEmail: orderData.customerEmail || '',
         orderComment: orderData.comment || '',
-        isTestOrder: isTestOrder.toString()
+        isTestOrder: 'true'
       }
     };
     
-    console.log('Sending order to Zettle:', JSON.stringify(zettleOrder, null, 2));
-    
+    console.log('Formatted Zettle order data:', JSON.stringify(zettleOrder, null, 2));
+
     // Create the order in Zettle
     const orderResponse = await fetch('https://purchase.izettle.com/purchases/v2', {
       method: 'POST',
@@ -80,30 +81,34 @@ exports.handler = async function (event, context) {
       body: JSON.stringify(zettleOrder)
     });
     
-    const responseStatus = orderResponse.status;
-    let responseData;
+    console.log(`Order creation status: ${orderResponse.status}`);
     
+    let responseData;
     try {
       const responseText = await orderResponse.text();
-      console.log(`Order creation response (${responseStatus}):`, responseText);
-      responseData = JSON.parse(responseText);
-    } catch (error) {
-      console.error('Error parsing response:', error);
-      throw new Error('Failed to parse response from Zettle');
+      console.log(`Order creation response: ${responseText}`);
+      
+      try {
+        responseData = JSON.parse(responseText);
+      } catch (e) {
+        // If not valid JSON, use the text
+        responseData = { text: responseText };
+      }
+    } catch (e) {
+      console.log('Failed to read response:', e.message);
     }
     
-    if (responseStatus !== 200 && responseStatus !== 201) {
-      throw new Error(`Failed to create order: ${JSON.stringify(responseData)}`);
+    if (orderResponse.status !== 200 && orderResponse.status !== 201) {
+      throw new Error(`Failed to create order: ${JSON.stringify(responseData || {})}`);
     }
-    
-    // Return success with order details
+
     return {
       statusCode: 200,
       body: JSON.stringify({
         status: 'success',
         orderId: purchaseUUID,
-        orderNumber: `COFFEE-${Date.now().toString().slice(-6)}`,
-        isTestOrder: isTestOrder
+        orderNumber: `TEST-${Date.now().toString().slice(-6)}`,
+        isTestOrder: true
       })
     };
   } catch (error) {
