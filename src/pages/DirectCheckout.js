@@ -1,11 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React from 'react';
 import { useCart } from '../context/CartContext';
 
 const DirectCheckout = () => {
   console.log("DirectCheckout component mounting");
-  const navigate = useNavigate();
-  const { items, totalAmount, clearCart } = useCart();
+  const { items, totalAmount } = useCart();
 
   // Very simple version to test
   return (
