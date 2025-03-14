@@ -7,7 +7,8 @@ import ZettlePayment from '../components/ZettlePayment';
 
 const Checkout = () => {
   const navigate = useNavigate();
-  const { items, totalAmount, clearCart } = useCart();
+  // Remove clearCart from destructuring if we're not using it yet
+  const { items, totalAmount } = useCart();
   const [name, setName] = useState('');
   const [pickupTime, setPickupTime] = useState('');
   const [email, setEmail] = useState('');

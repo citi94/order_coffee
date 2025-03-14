@@ -1,7 +1,8 @@
 // src/components/ZettlePayment.js
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { checkPaymentStatus } from '../utils/api';
+// Remove the unused import
+// import { checkPaymentStatus } from '../utils/api';
 
 const ZettlePayment = ({ orderId, amount, customerName }) => {
   const paymentContainerRef = useRef(null);
@@ -62,13 +63,16 @@ const ZettlePayment = ({ orderId, amount, customerName }) => {
 
     initializePayment();
     
-    // Cleanup function
+    // Cleanup function - we reference paymentInstance from state at cleanup time
     return () => {
-      if (paymentInstance) {
-        paymentInstance.destroy();
+      // Use the current state value when the cleanup function runs
+      const currentPaymentInstance = paymentInstance;
+      if (currentPaymentInstance) {
+        currentPaymentInstance.destroy();
       }
     };
-  }, [orderId, amount]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orderId, amount]); // Remove paymentInstance from the dependency array to avoid loops
 
   const handleApplePayPayment = async () => {
     if (!paymentInstance) return;
