@@ -1,4 +1,4 @@
-// In netlify/functions/create-order.js
+// netlify/functions/create-order.js
 const fetch = require('node-fetch');
 
 exports.handler = async function (event, context) {
@@ -14,7 +14,7 @@ exports.handler = async function (event, context) {
     const orderData = JSON.parse(event.body);
     console.log('Received order data:', JSON.stringify(orderData, null, 2));
     
-    // Get access token
+    // Get access token using JWT Bearer method
     console.log('Getting Zettle access token...');
     const tokenResponse = await fetch('https://oauth.zettle.com/token', {
       method: 'POST',
@@ -38,26 +38,42 @@ exports.handler = async function (event, context) {
     
     console.log('Successfully obtained access token');
 
-    // Simplify the order data for Zettle API
-    // This is a key change - we're formatting the data exactly as Zettle expects
+    // First let's try to figure out the right API endpoint
+    console.log('Checking available Zettle API endpoints...');
+    
+    // Try to query the Zettle API for purchase endpoints
+    const endpointInfoResponse = await fetch('https://purchase.izettle.com', {
+      headers: {
+        'Authorization': `Bearer ${access_token}`
+      }
+    });
+    
+    console.log('Endpoint info status:', endpointInfoResponse.status);
+    try {
+      const endpointInfo = await endpointInfoResponse.text();
+      console.log('Available endpoints:', endpointInfo);
+    } catch (error) {
+      console.log('Could not get endpoint info:', error.message);
+    }
+    
+    // Prepare order data - try a simpler format first
     const zettleOrder = {
-      purchaseUUID: `order-${Date.now()}`, // Generate a unique order ID
-      clientUUID: `client-${Date.now()}`, // Generate a unique client ID
       source: "ONLINE_ORDER",
-      products: orderData.items.map(item => ({
-        productUuid: item.id,
+      orderItems: orderData.items.map(item => ({
         name: item.name,
         quantity: item.quantity,
         unitPrice: {
-          amount: item.unitPrice || item.price, // Ensure we have a price
+          amount: item.unitPrice || item.price,
           currencyId: "GBP"
         },
+        // Add options as comment if present
         comment: item.options ? 
           Object.entries(item.options)
-            .filter(([key, value]) => value) // Filter out empty options
+            .filter(([key, value]) => value)
             .map(([key, value]) => `${key}: ${value}`)
             .join(', ') : ''
       })),
+      // Add metadata
       metadata: {
         customerName: orderData.customerName || '',
         customerEmail: orderData.customerEmail || '',
@@ -67,59 +83,63 @@ exports.handler = async function (event, context) {
     
     console.log('Formatted Zettle order data:', JSON.stringify(zettleOrder, null, 2));
 
-    // Create order in Zettle
-    console.log('Sending order to Zettle API...');
-    const orderResponse = await fetch(
+    // Try multiple endpoints to determine which one works
+    const endpoints = [
       'https://purchase.izettle.com/purchases/v2',
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${access_token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(zettleOrder)
+      'https://purchase.izettle.com/purchases/v2/orders',
+      'https://purchase.izettle.com/v2/orders',
+      'https://order.izettle.com/organizations/self/orders'
+    ];
+    
+    let orderResult = null;
+    let successEndpoint = null;
+    
+    for (const endpoint of endpoints) {
+      try {
+        console.log(`Trying endpoint: ${endpoint}`);
+        const orderResponse = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${access_token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(zettleOrder)
+        });
+        
+        console.log(`${endpoint} status:`, orderResponse.status);
+        
+        // If succeeded or provided useful error info
+        if (orderResponse.status !== 404) {
+          const responseText = await orderResponse.text();
+          console.log(`${endpoint} response:`, responseText);
+          
+          try {
+            const result = JSON.parse(responseText);
+            if (orderResponse.status === 200 || orderResponse.status === 201) {
+              orderResult = result;
+              successEndpoint = endpoint;
+              break;
+            }
+          } catch (error) {
+            console.log('Failed to parse response:', error.message);
+          }
+        }
+      } catch (error) {
+        console.error(`Error with endpoint ${endpoint}:`, error);
       }
-    );
-    
-    console.log('Zettle API response status:', orderResponse.status);
-    
-    // Get full response text for debugging
-    const responseText = await orderResponse.text();
-    console.log('Zettle API response:', responseText);
-    
-    let orderResult;
-    try {
-      orderResult = JSON.parse(responseText);
-    } catch (error) {
-      console.error('Failed to parse order response:', error);
-      return {
-        statusCode: 500,
-        body: JSON.stringify({
-          status: 'error',
-          message: 'Failed to parse response from Zettle',
-          responseText: responseText
-        })
-      };
     }
-
-    if (!orderResult.purchaseUUID) {
-      console.error('Order creation failed:', JSON.stringify(orderResult));
-      return {
-        statusCode: 400,
-        body: JSON.stringify({
-          status: 'error',
-          message: 'Failed to create order in Zettle',
-          details: orderResult
-        })
-      };
+    
+    if (!orderResult) {
+      throw new Error('Failed to create order: Could not find a working API endpoint');
     }
 
     return {
       statusCode: 200,
       body: JSON.stringify({
         status: 'success',
-        orderId: orderResult.purchaseUUID,
-        orderNumber: orderResult.purchaseNumber || Date.now().toString().slice(-6)
+        orderId: orderResult.uuid || orderResult.orderId || orderResult.purchaseUUID || `order-${Date.now()}`,
+        orderNumber: orderResult.orderNumber || Date.now().toString().slice(-6),
+        endpoint: successEndpoint
       })
     };
   } catch (error) {
