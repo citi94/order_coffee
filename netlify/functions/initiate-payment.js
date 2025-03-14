@@ -56,7 +56,7 @@ exports.handler = async function (event, context) {
           currencyId: "GBP"
         },
         title: "Coffee Order",
-        redirectUrl: `${process.env.URL}/confirmation?orderId=${orderId}`,
+        redirectUrl: `${process.env.SITE_URL}/confirmation?orderId=${orderId}`,
         reference: `order_${Date.now()}`
       })
     });
